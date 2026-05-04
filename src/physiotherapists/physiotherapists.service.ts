@@ -8,6 +8,7 @@ import {
   TherapistVerificationStatus,
   UserRole,
 } from '@prisma/client';
+import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthUser } from '../common/types/auth-user.type';
 import { BrowsePhysiotherapistsQueryDto } from './dto/browse-physiotherapists-query.dto';
@@ -16,7 +17,10 @@ import { VerifyPhysiotherapistDto } from './dto/verify-physiotherapist.dto';
 
 @Injectable()
 export class PhysiotherapistsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notificationsService: NotificationsService,
+  ) {}
 
   async getMyProfile(authUser: AuthUser) {
     const profile = await this.prisma.physiotherapistProfile.findUnique({
@@ -160,7 +164,7 @@ export class PhysiotherapistsService {
       throw new NotFoundException('Physiotherapist profile not found.');
     }
 
-    return this.prisma.physiotherapistProfile.update({
+    const updated = await this.prisma.physiotherapistProfile.update({
       where: { id: profileId },
       data: {
         verificationStatus: dto.status,
@@ -180,5 +184,27 @@ export class PhysiotherapistsService {
         category: true,
       },
     });
+
+    await this.safeNotify(
+      updated.user.id,
+      'Verification Status Updated',
+      dto.status === TherapistVerificationStatus.APPROVED
+        ? 'Your physiotherapist profile has been approved by admin.'
+        : `Your profile was rejected. Reason: ${dto.rejectionReason ?? 'N/A'}`,
+    );
+
+    return updated;
+  }
+
+  private async safeNotify(
+    userId: string,
+    title: string,
+    body: string,
+  ): Promise<void> {
+    try {
+      await this.notificationsService.createSystemNotification(userId, title, body);
+    } catch {
+      // Notification failures should not block verification flow.
+    }
   }
 }

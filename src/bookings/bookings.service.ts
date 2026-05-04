@@ -13,6 +13,7 @@ import {
   TransactionStatus,
   UserRole,
 } from '@prisma/client';
+import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { AuthUser } from '../common/types/auth-user.type';
@@ -25,7 +26,10 @@ import { UpdateConsultationStatusDto } from './dto/update-consultation-status.dt
 
 @Injectable()
 export class BookingsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notificationsService: NotificationsService,
+  ) {}
 
   async createConsultation(authUser: AuthUser, dto: CreateConsultationDto) {
     const patientProfile = await this.prisma.patientProfile.findUnique({
@@ -45,7 +49,7 @@ export class BookingsService {
       throw new BadRequestException('Physiotherapist is not approved yet.');
     }
 
-    return this.prisma.consultation.create({
+    const consultation = await this.prisma.consultation.create({
       data: {
         patientId: patientProfile.id,
         physiotherapistId: therapist.id,
@@ -58,6 +62,14 @@ export class BookingsService {
         },
       },
     });
+
+    await this.safeNotify(
+      therapist.userId,
+      'New Consultation Request',
+      'A patient submitted a new consultation request for you.',
+    );
+
+    return consultation;
   }
 
   async listMyConsultations(authUser: AuthUser, query: PaginationQueryDto) {
@@ -143,10 +155,38 @@ export class BookingsService {
       throw new ForbiddenException('Unauthorized role.');
     }
 
-    return this.prisma.consultation.update({
+    const updated = await this.prisma.consultation.update({
       where: { id: consultationId },
       data: { status: dto.status },
     });
+
+    if (authUser.role === UserRole.PHYSIOTHERAPIST) {
+      const patient = await this.prisma.patientProfile.findUnique({
+        where: { id: consultation.patientId },
+        select: { userId: true },
+      });
+      if (patient) {
+        await this.safeNotify(
+          patient.userId,
+          'Consultation Status Updated',
+          `Your consultation status is now ${dto.status}.`,
+        );
+      }
+    } else if (authUser.role === UserRole.PATIENT) {
+      const therapist = await this.prisma.physiotherapistProfile.findUnique({
+        where: { id: consultation.physiotherapistId },
+        select: { userId: true },
+      });
+      if (therapist) {
+        await this.safeNotify(
+          therapist.userId,
+          'Consultation Cancelled',
+          'A patient cancelled a consultation request.',
+        );
+      }
+    }
+
+    return updated;
   }
 
   async createBooking(authUser: AuthUser, dto: CreateBookingDto) {
@@ -195,7 +235,7 @@ export class BookingsService {
       }
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    const booking = await this.prisma.$transaction(async (tx) => {
       const booking = await tx.booking.create({
         data: {
           consultationId: dto.consultationId,
@@ -220,6 +260,14 @@ export class BookingsService {
 
       return booking;
     });
+
+    await this.safeNotify(
+      therapist.userId,
+      'New Booking Request',
+      'A patient created a new booking request.',
+    );
+
+    return booking;
   }
 
   async listMyBookings(authUser: AuthUser, query: PaginationQueryDto) {
@@ -296,7 +344,7 @@ export class BookingsService {
       throw new ForbiddenException('Unauthorized role.');
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    const updated = await this.prisma.$transaction(async (tx) => {
       const updated = await tx.booking.update({
         where: { id: bookingId },
         data: { status: dto.status },
@@ -311,6 +359,25 @@ export class BookingsService {
       }
       return updated;
     });
+
+    if (
+      authUser.role === UserRole.PHYSIOTHERAPIST ||
+      authUser.role === UserRole.ADMIN
+    ) {
+      const patient = await this.prisma.patientProfile.findUnique({
+        where: { id: booking.patientId },
+        select: { userId: true },
+      });
+      if (patient) {
+        await this.safeNotify(
+          patient.userId,
+          'Booking Status Updated',
+          `Your booking status is now ${dto.status}.`,
+        );
+      }
+    }
+
+    return updated;
   }
 
   async createTransaction(authUser: AuthUser, dto: CreateTransactionDto) {
@@ -356,10 +423,18 @@ export class BookingsService {
       throw new BadRequestException('Only pending transaction can be marked as paid.');
     }
 
-    return this.prisma.transaction.update({
+    const updated = await this.prisma.transaction.update({
       where: { id: transactionId },
       data: { status: TransactionStatus.PAID, paidAt: new Date() },
     });
+
+    await this.safeNotify(
+      authUser.sub,
+      'Payment Successful',
+      'Your transaction has been marked as PAID.',
+    );
+
+    return updated;
   }
 
   async refundTransactionByAdmin(
@@ -374,7 +449,7 @@ export class BookingsService {
       throw new BadRequestException('Only paid transaction can be refunded.');
     }
 
-    return this.prisma.transaction.update({
+    const updated = await this.prisma.transaction.update({
       where: { id: transactionId },
       data: {
         status: TransactionStatus.REFUNDED,
@@ -382,6 +457,20 @@ export class BookingsService {
         refundReason: dto.reason,
       },
     });
+
+    const patient = await this.prisma.patientProfile.findUnique({
+      where: { id: transaction.patientId },
+      select: { userId: true },
+    });
+    if (patient) {
+      await this.safeNotify(
+        patient.userId,
+        'Transaction Refunded',
+        `Your transaction was refunded. Reason: ${dto.reason}`,
+      );
+    }
+
+    return updated;
   }
 
   async listTransactions(authUser: AuthUser, query: PaginationQueryDto) {
@@ -406,5 +495,17 @@ export class BookingsService {
       skip,
       take,
     });
+  }
+
+  private async safeNotify(
+    userId: string,
+    title: string,
+    body: string,
+  ): Promise<void> {
+    try {
+      await this.notificationsService.createSystemNotification(userId, title, body);
+    } catch {
+      // Notification failures should not break core transaction flow.
+    }
   }
 }

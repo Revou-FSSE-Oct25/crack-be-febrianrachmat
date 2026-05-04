@@ -72,6 +72,17 @@ export class NotificationsService {
     });
   }
 
+  // Internal helper used by domain services to emit system notifications.
+  async createSystemNotification(userId: string, title: string, body: string) {
+    return this.prisma.notification.create({
+      data: {
+        userId,
+        title,
+        body,
+      },
+    });
+  }
+
   async broadcastToAllUsers(dto: CreateNotificationDto) {
     const users = await this.prisma.user.findMany({
       where: { isActive: true },

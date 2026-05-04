@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { BookingStatus, UserRole } from '@prisma/client';
+import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { AuthUser } from '../common/types/auth-user.type';
@@ -13,7 +14,10 @@ import { ModerateReviewDto } from './dto/moderate-review.dto';
 
 @Injectable()
 export class ReviewsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notificationsService: NotificationsService,
+  ) {}
 
   async createReview(authUser: AuthUser, dto: CreateReviewDto) {
     const patient = await this.prisma.patientProfile.findUnique({
@@ -43,7 +47,7 @@ export class ReviewsService {
       throw new BadRequestException('Review already exists for this booking.');
     }
 
-    return this.prisma.review.create({
+    const review = await this.prisma.review.create({
       data: {
         bookingId: booking.id,
         patientId: patient.id,
@@ -52,6 +56,20 @@ export class ReviewsService {
         comment: dto.comment,
       },
     });
+
+    const therapist = await this.prisma.physiotherapistProfile.findUnique({
+      where: { id: booking.physiotherapistId },
+      select: { userId: true },
+    });
+    if (therapist) {
+      await this.safeNotify(
+        therapist.userId,
+        'New Review Received',
+        `You received a new review with rating ${dto.rating}/5.`,
+      );
+    }
+
+    return review;
   }
 
   async listPublicReviewsByPhysiotherapist(
@@ -115,13 +133,29 @@ export class ReviewsService {
     });
     if (!review) throw new NotFoundException('Review not found.');
 
-    return this.prisma.review.update({
+    const updated = await this.prisma.review.update({
       where: { id: reviewId },
       data: {
         isHidden: dto.isHidden,
         moderationNote: dto.moderationNote ?? null,
       },
     });
+
+    const patient = await this.prisma.patientProfile.findUnique({
+      where: { id: review.patientId },
+      select: { userId: true },
+    });
+    if (patient) {
+      await this.safeNotify(
+        patient.userId,
+        'Review Moderation Update',
+        dto.isHidden
+          ? 'Your review was hidden by admin moderation.'
+          : 'Your review is visible again after moderation.',
+      );
+    }
+
+    return updated;
   }
 
   async deleteMyReview(authUser: AuthUser, reviewId: string) {
@@ -142,5 +176,17 @@ export class ReviewsService {
 
     await this.prisma.review.delete({ where: { id: reviewId } });
     return { message: 'Review deleted successfully.' };
+  }
+
+  private async safeNotify(
+    userId: string,
+    title: string,
+    body: string,
+  ): Promise<void> {
+    try {
+      await this.notificationsService.createSystemNotification(userId, title, body);
+    } catch {
+      // Notification failures should not break review operations.
+    }
   }
 }
