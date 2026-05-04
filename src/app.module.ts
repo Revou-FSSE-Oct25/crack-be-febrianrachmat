@@ -6,6 +6,7 @@ import { BookingsModule } from './bookings/bookings.module';
 import { CategoriesModule } from './categories/categories.module';
 import { ChatModule } from './chat/chat.module';
 import { HealthModule } from './health/health.module';
+import { NotificationsModule } from './notifications/notifications.module';
 import { PhysiotherapistsModule } from './physiotherapists/physiotherapists.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { ReviewsModule } from './reviews/reviews.module';
@@ -24,6 +25,7 @@ import { UsersModule } from './users/users.module';
     PhysiotherapistsModule,
     BookingsModule,
     ChatModule,
+    NotificationsModule,
     ReviewsModule,
     HealthModule,
   ],
