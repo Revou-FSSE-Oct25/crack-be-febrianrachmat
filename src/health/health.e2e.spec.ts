@@ -1,6 +1,6 @@
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import request from 'supertest';
+import * as request from 'supertest';
 import { HealthController } from './health.controller';
 import { PrismaService } from '../prisma/prisma.service';
 
