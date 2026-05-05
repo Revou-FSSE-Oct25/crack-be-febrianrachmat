@@ -59,6 +59,8 @@ Quick map of automated test coverage currently available in this repository.
   - System notification helper behavior.
 - `src/notifications/notifications.controller.spec.ts`
   - Controller delegation coverage for list/read/read-all/send/broadcast endpoints.
+- `src/notifications/notifications.e2e.spec.ts`
+  - E2E-lite smoke coverage for protected notifications read flow (`GET /notifications/me`, `PATCH /notifications/read-all`) using mock auth guard.
 
 ## Known test gaps (next candidates)
 
