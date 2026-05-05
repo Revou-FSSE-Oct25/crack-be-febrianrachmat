@@ -223,4 +223,32 @@ describe('BookingsService booking transition guard', () => {
       ),
     ).rejects.toThrow(BadRequestException);
   });
+
+  it('rejects booking when consultation status is CANCELLED', async () => {
+    prismaMock.patientProfile.findUnique.mockResolvedValue({ id: 'patient-1' });
+    prismaMock.physiotherapistProfile.findUnique.mockResolvedValue({
+      id: 'therapist-1',
+      userId: 'therapist-user-1',
+      verificationStatus: 'APPROVED',
+    });
+    prismaMock.consultation.findUnique.mockResolvedValue({
+      id: 'consultation-1',
+      patientId: 'patient-1',
+      physiotherapistId: 'therapist-1',
+      status: ConsultationStatus.CANCELLED,
+    });
+
+    await expect(
+      service.createBooking(
+        { sub: 'patient-user-1', email: 'p@mail.com', role: UserRole.PATIENT },
+        {
+          consultationId: 'consultation-1',
+          physiotherapistId: 'therapist-1',
+          appointmentType: 'CLINIC_VISIT',
+          appointmentDate: '2099-05-10T09:00:00.000Z',
+          clinicAddress: 'Jl. Klinik Utama 123',
+        },
+      ),
+    ).rejects.toThrow(BadRequestException);
+  });
 });
