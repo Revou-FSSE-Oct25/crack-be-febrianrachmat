@@ -161,4 +161,32 @@ describe('Bookings listing (e2e-lite)', () => {
       },
     );
   });
+
+  it('PATCH /bookings/:bookingId/status forwards user, bookingId, and status dto', async () => {
+    bookingsServiceMock.updateBookingStatus.mockResolvedValue({
+      id: 'booking-1',
+      status: 'CANCELLED',
+    });
+
+    await request(app.getHttpServer())
+      .patch('/bookings/booking-1/status')
+      .send({ status: 'CANCELLED' })
+      .expect(200)
+      .expect(({ body }) => {
+        expect(body).toEqual({
+          id: 'booking-1',
+          status: 'CANCELLED',
+        });
+      });
+
+    expect(bookingsServiceMock.updateBookingStatus).toHaveBeenCalledWith(
+      {
+        sub: 'patient-user-1',
+        email: 'patient@mail.com',
+        role: UserRole.PATIENT,
+      },
+      'booking-1',
+      { status: 'CANCELLED' },
+    );
+  });
 });
