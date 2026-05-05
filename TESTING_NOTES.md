@@ -13,6 +13,8 @@ Quick map of automated test coverage currently available in this repository.
 
 - `src/auth/guards/roles.guard.spec.ts`
   - Role authorization checks in `RolesGuard`.
+- `src/auth/auth.e2e.spec.ts`
+  - E2E-lite smoke coverage for public auth endpoints (`register`, `login`) with validation pipe enabled.
 
 ### Response shaping
 
@@ -23,6 +25,8 @@ Quick map of automated test coverage currently available in this repository.
 
 - `src/health/health.controller.spec.ts`
   - Basic health endpoint behavior.
+- `src/health/health.e2e.spec.ts`
+  - E2E-lite smoke coverage for `/health` response in connected/degraded database scenarios.
 
 ### Booking + transaction domain
 
@@ -57,7 +61,7 @@ Quick map of automated test coverage currently available in this repository.
 
 ## Known test gaps (next candidates)
 
-- Integration/e2e flow tests across modules:
+- Deeper integration/e2e flow tests across modules:
   - auth -> create slot -> create booking -> transaction -> notification.
 - Negative-path tests for more role/ownership edge cases in controller layer.
 - Optional: coverage threshold in Jest config to enforce minimum baseline.
