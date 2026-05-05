@@ -136,4 +136,52 @@ describe('NotificationsService', () => {
       createdCount: 2,
     });
   });
+
+  it('markAllAsRead updates unread notifications and returns summary', async () => {
+    prismaMock.notification.updateMany.mockResolvedValue({ count: 3 });
+
+    const result = await service.markAllAsRead({
+      sub: 'user-1',
+      email: 'u@mail.com',
+      role: UserRole.PATIENT,
+    });
+
+    expect(prismaMock.notification.updateMany).toHaveBeenCalledWith({
+      where: { userId: 'user-1', isRead: false },
+      data: { isRead: true },
+    });
+    expect(result).toEqual({
+      message: 'All notifications marked as read.',
+      updatedCount: 3,
+    });
+  });
+
+  it('createSystemNotification creates direct notification payload', async () => {
+    prismaMock.notification.create.mockResolvedValue({
+      id: 'n-system-1',
+      userId: 'user-1',
+      title: 'System',
+      body: 'Message',
+    });
+
+    const result = await service.createSystemNotification(
+      'user-1',
+      'System',
+      'Message',
+    );
+
+    expect(prismaMock.notification.create).toHaveBeenCalledWith({
+      data: {
+        userId: 'user-1',
+        title: 'System',
+        body: 'Message',
+      },
+    });
+    expect(result).toEqual({
+      id: 'n-system-1',
+      userId: 'user-1',
+      title: 'System',
+      body: 'Message',
+    });
+  });
 });
