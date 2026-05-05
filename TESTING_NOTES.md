@@ -15,6 +15,7 @@ Quick map of automated test coverage currently available in this repository.
   - Role authorization checks in `RolesGuard`.
 - `src/auth/auth.e2e.spec.ts`
   - E2E-lite smoke coverage for public auth endpoints (`register`, `login`) with validation pipe enabled.
+  - Protected route smoke coverage for `GET /auth/me` using a mock auth guard.
 
 ### Response shaping
 
