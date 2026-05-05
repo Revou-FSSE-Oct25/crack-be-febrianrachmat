@@ -134,4 +134,52 @@ describe('AvailabilitySlotsService', () => {
       ),
     ).rejects.toThrow(NotFoundException);
   });
+
+  it('rejects removeMine when slot has active (non-cancelled) booking', async () => {
+    prismaMock.physiotherapistProfile.findUnique.mockResolvedValue({
+      id: 'therapist-profile-1',
+    });
+    prismaMock.availabilitySlot.findUnique.mockResolvedValue({
+      id: 'slot-1',
+      physiotherapistId: 'therapist-profile-1',
+      _count: { bookings: 1 },
+    });
+
+    await expect(
+      service.removeMine(
+        {
+          sub: 'therapist-user-1',
+          email: 't@mail.com',
+          role: UserRole.PHYSIOTHERAPIST,
+        },
+        'slot-1',
+      ),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it('deletes slot when no active booking exists', async () => {
+    prismaMock.physiotherapistProfile.findUnique.mockResolvedValue({
+      id: 'therapist-profile-1',
+    });
+    prismaMock.availabilitySlot.findUnique.mockResolvedValue({
+      id: 'slot-1',
+      physiotherapistId: 'therapist-profile-1',
+      _count: { bookings: 0 },
+    });
+    prismaMock.availabilitySlot.delete.mockResolvedValue({ id: 'slot-1' });
+
+    const result = await service.removeMine(
+      {
+        sub: 'therapist-user-1',
+        email: 't@mail.com',
+        role: UserRole.PHYSIOTHERAPIST,
+      },
+      'slot-1',
+    );
+
+    expect(prismaMock.availabilitySlot.delete).toHaveBeenCalledWith({
+      where: { id: 'slot-1' },
+    });
+    expect(result).toEqual({ message: 'Availability slot deleted.' });
+  });
 });
