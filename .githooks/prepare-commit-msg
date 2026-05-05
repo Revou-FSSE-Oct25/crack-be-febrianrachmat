@@ -1,0 +1,8 @@
+#!/bin/sh
+# Removes Cursor co-author trailers so GitHub only shows your account as author.
+# Enable once: git config core.hooksPath .githooks
+commit_msg_file="$1"
+[ -z "$commit_msg_file" ] || [ ! -f "$commit_msg_file" ] && exit 0
+tmp="${commit_msg_file}.tmp"
+grep -v '^Co-authored-by: Cursor' "$commit_msg_file" >"$tmp" && mv "$tmp" "$commit_msg_file"
+exit 0

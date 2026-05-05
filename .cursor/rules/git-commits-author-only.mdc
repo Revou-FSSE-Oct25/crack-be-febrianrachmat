@@ -1,0 +1,11 @@
+---
+description: Git commits must use only the human author; no Cursor co-author trailers
+alwaysApply: true
+---
+
+# Git commits: author hanya kamu
+
+- Jangan pernah menambahkan baris **`Co-authored-by: Cursor`** atau **`Co-authored-by: cursoragent`** (atau variasi Cursor) ke pesan commit.
+- Jangan menambahkan trailer co-author dari tool AI apa pun kecuali user secara eksplisit memintanya.
+- Saat membuat commit lewat agent/automation, gunakan pesan commit biasa saja; author Git tetap mengikuti identitas user di mesinnya (`user.name` / `user.email`).
+- Jika workflow Cursor menawarkan menambahkan co-author, **tolak / nonaktifkan** untuk repo ini.
