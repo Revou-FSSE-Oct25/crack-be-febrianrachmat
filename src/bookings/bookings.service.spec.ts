@@ -15,9 +15,9 @@ describe('BookingsService booking transition guard', () => {
   const prismaMock = {
     patientProfile: { findUnique: jest.fn() },
     physiotherapistProfile: { findUnique: jest.fn() },
-    consultation: { findUnique: jest.fn() },
+    consultation: { findUnique: jest.fn(), findMany: jest.fn() },
     availabilitySlot: { findUnique: jest.fn() },
-    booking: { findUnique: jest.fn() },
+    booking: { findUnique: jest.fn(), findMany: jest.fn() },
     transaction: {
       findUnique: jest.fn(),
       create: jest.fn(),
@@ -265,6 +265,48 @@ describe('BookingsService booking transition guard', () => {
         },
       ),
     ).rejects.toThrow(BadRequestException);
+  });
+
+  it('lists consultations for patient based on patient profile id', async () => {
+    prismaMock.patientProfile.findUnique.mockResolvedValue({ id: 'patient-1' });
+    prismaMock.consultation.findMany.mockResolvedValue([{ id: 'consult-1' }]);
+
+    const result = await service.listMyConsultations(
+      { sub: 'patient-user-1', email: 'p@mail.com', role: UserRole.PATIENT },
+      { page: 2, limit: 5 },
+    );
+
+    expect(prismaMock.consultation.findMany).toHaveBeenCalledWith({
+      where: { patientId: 'patient-1' },
+      orderBy: { createdAt: 'desc' },
+      skip: 5,
+      take: 5,
+    });
+    expect(result).toEqual([{ id: 'consult-1' }]);
+  });
+
+  it('lists bookings for therapist based on therapist profile id', async () => {
+    prismaMock.physiotherapistProfile.findUnique.mockResolvedValue({
+      id: 'therapist-1',
+    });
+    prismaMock.booking.findMany.mockResolvedValue([{ id: 'book-1' }]);
+
+    const result = await service.listMyBookings(
+      {
+        sub: 'therapist-user-1',
+        email: 't@mail.com',
+        role: UserRole.PHYSIOTHERAPIST,
+      },
+      { page: 1, limit: 10 },
+    );
+
+    expect(prismaMock.booking.findMany).toHaveBeenCalledWith({
+      where: { physiotherapistId: 'therapist-1' },
+      orderBy: { appointmentDate: 'desc' },
+      skip: 0,
+      take: 10,
+    });
+    expect(result).toEqual([{ id: 'book-1' }]);
   });
 
   it('creates transaction for own booking only', async () => {
