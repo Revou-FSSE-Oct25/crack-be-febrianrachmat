@@ -19,6 +19,11 @@ describe('AvailabilitySlotsService', () => {
   };
 
   const service = new AvailabilitySlotsService(prismaMock as never);
+  const THERAPIST_USER = {
+    sub: 'therapist-user-1',
+    email: 't@mail.com',
+    role: UserRole.PHYSIOTHERAPIST,
+  };
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -32,11 +37,7 @@ describe('AvailabilitySlotsService', () => {
     prismaMock.availabilitySlot.create.mockResolvedValue({ id: 'slot-1' });
 
     await service.createMine(
-      {
-        sub: 'therapist-user-1',
-        email: 't@mail.com',
-        role: UserRole.PHYSIOTHERAPIST,
-      },
+      THERAPIST_USER,
       {
         slotDate: '2099-06-01',
         startTime: '2099-06-01T09:00:00.000Z',
@@ -61,11 +62,7 @@ describe('AvailabilitySlotsService', () => {
 
     await expect(
       service.createMine(
-        {
-          sub: 'therapist-user-1',
-          email: 't@mail.com',
-          role: UserRole.PHYSIOTHERAPIST,
-        },
+        THERAPIST_USER,
         {
           slotDate: '2099-06-02',
           startTime: '2099-06-01T09:00:00.000Z',
@@ -83,11 +80,7 @@ describe('AvailabilitySlotsService', () => {
 
     await expect(
       service.createMine(
-        {
-          sub: 'therapist-user-1',
-          email: 't@mail.com',
-          role: UserRole.PHYSIOTHERAPIST,
-        },
+        THERAPIST_USER,
         {
           slotDate: '2099-06-01',
           startTime: '2099-06-01T09:30:00.000Z',
@@ -113,11 +106,7 @@ describe('AvailabilitySlotsService', () => {
 
     await expect(
       service.updateMine(
-        {
-          sub: 'therapist-user-1',
-          email: 't@mail.com',
-          role: UserRole.PHYSIOTHERAPIST,
-        },
+        THERAPIST_USER,
         'slot-1',
         { startTime: '2099-06-01T11:00:00.000Z' },
       ),
@@ -140,11 +129,7 @@ describe('AvailabilitySlotsService', () => {
 
     await expect(
       service.updateMine(
-        {
-          sub: 'therapist-user-1',
-          email: 't@mail.com',
-          role: UserRole.PHYSIOTHERAPIST,
-        },
+        THERAPIST_USER,
         'slot-1',
         { isAvailable: true },
       ),
@@ -170,11 +155,7 @@ describe('AvailabilitySlotsService', () => {
 
     await expect(
       service.createMine(
-        {
-          sub: 'therapist-user-1',
-          email: 't@mail.com',
-          role: UserRole.PHYSIOTHERAPIST,
-        },
+        THERAPIST_USER,
         {
           slotDate: '2099-06-01',
           startTime: '2099-06-01T09:00:00.000Z',
@@ -196,11 +177,7 @@ describe('AvailabilitySlotsService', () => {
 
     await expect(
       service.removeMine(
-        {
-          sub: 'therapist-user-1',
-          email: 't@mail.com',
-          role: UserRole.PHYSIOTHERAPIST,
-        },
+        THERAPIST_USER,
         'slot-1',
       ),
     ).rejects.toThrow(BadRequestException);
@@ -217,14 +194,7 @@ describe('AvailabilitySlotsService', () => {
     });
     prismaMock.availabilitySlot.delete.mockResolvedValue({ id: 'slot-1' });
 
-    const result = await service.removeMine(
-      {
-        sub: 'therapist-user-1',
-        email: 't@mail.com',
-        role: UserRole.PHYSIOTHERAPIST,
-      },
-      'slot-1',
-    );
+    const result = await service.removeMine(THERAPIST_USER, 'slot-1');
 
     expect(prismaMock.availabilitySlot.delete).toHaveBeenCalledWith({
       where: { id: 'slot-1' },
@@ -246,19 +216,12 @@ describe('AvailabilitySlotsService', () => {
       12,
     ]);
 
-    const result = await service.listMine(
-      {
-        sub: 'therapist-user-1',
-        email: 't@mail.com',
-        role: UserRole.PHYSIOTHERAPIST,
-      },
-      {
-        page: 2,
-        limit: 5,
-        from: '2099-06-01',
-        to: '2099-06-30',
-      },
-    );
+    const result = await service.listMine(THERAPIST_USER, {
+      page: 2,
+      limit: 5,
+      from: '2099-06-01',
+      to: '2099-06-30',
+    });
 
     expect(prismaMock.availabilitySlot.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
