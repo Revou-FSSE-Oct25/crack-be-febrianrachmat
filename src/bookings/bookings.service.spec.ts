@@ -11,7 +11,7 @@ import {
 } from '@prisma/client';
 import { BookingsService } from './bookings.service';
 
-describe('BookingsService booking transition guard', () => {
+describe('BookingsService', () => {
   const prismaMock = {
     patientProfile: { findUnique: jest.fn() },
     physiotherapistProfile: { findUnique: jest.fn() },
@@ -65,6 +65,7 @@ describe('BookingsService booking transition guard', () => {
     jest.clearAllMocks();
   });
 
+  // Booking status transition guards
   it('allows valid transition PENDING -> CONFIRMED', () => {
     expect(() => callAssertTransition(BookingStatus.PENDING, BookingStatus.CONFIRMED)).not.toThrow();
   });
@@ -87,6 +88,7 @@ describe('BookingsService booking transition guard', () => {
     );
   });
 
+  // createBooking validations
   it('accepts booking when appointmentDate matches selected slot startTime', async () => {
     prismaMock.patientProfile.findUnique.mockResolvedValue({ id: 'patient-1' });
     prismaMock.physiotherapistProfile.findUnique.mockResolvedValue({
@@ -280,6 +282,7 @@ describe('BookingsService booking transition guard', () => {
     ).rejects.toThrow(BadRequestException);
   });
 
+  // listMyConsultations / listMyBookings role-based behavior
   it('lists consultations for patient based on patient profile id', async () => {
     prismaMock.patientProfile.findUnique.mockResolvedValue({ id: 'patient-1' });
     prismaMock.consultation.findMany.mockResolvedValue([{ id: 'consult-1' }]);
@@ -366,6 +369,7 @@ describe('BookingsService booking transition guard', () => {
     expect(result).toEqual([{ id: 'booking-admin-1' }]);
   });
 
+  // Transaction flow validations
   it('creates transaction for own booking only', async () => {
     prismaMock.patientProfile.findUnique.mockResolvedValue({ id: 'patient-1' });
     prismaMock.booking.findUnique.mockResolvedValue({
