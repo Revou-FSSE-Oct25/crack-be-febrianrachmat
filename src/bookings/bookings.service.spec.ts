@@ -18,7 +18,12 @@ describe('BookingsService booking transition guard', () => {
     consultation: { findUnique: jest.fn() },
     availabilitySlot: { findUnique: jest.fn() },
     booking: { findUnique: jest.fn() },
-    transaction: { findUnique: jest.fn(), create: jest.fn(), update: jest.fn() },
+    transaction: {
+      findUnique: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+      findMany: jest.fn(),
+    },
     $transaction: jest.fn(),
   };
   const notificationsMock = {
@@ -337,6 +342,34 @@ describe('BookingsService booking transition guard', () => {
     );
   });
 
+  it('still marks transaction paid even if notification fails', async () => {
+    prismaMock.patientProfile.findUnique.mockResolvedValue({ id: 'patient-1' });
+    prismaMock.transaction.findUnique.mockResolvedValue({
+      id: 'tx-1',
+      patientId: 'patient-1',
+      status: TransactionStatus.PENDING,
+    });
+    prismaMock.transaction.update.mockResolvedValue({
+      id: 'tx-1',
+      status: TransactionStatus.PAID,
+    });
+    notificationsMock.createSystemNotification.mockRejectedValue(
+      new Error('notification service down'),
+    );
+
+    await expect(
+      service.markTransactionPaid(
+        { sub: 'patient-user-1', email: 'p@mail.com', role: UserRole.PATIENT },
+        'tx-1',
+      ),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        id: 'tx-1',
+        status: TransactionStatus.PAID,
+      }),
+    );
+  });
+
   it('rejects mark paid when role is not patient', async () => {
     await expect(
       service.markTransactionPaid(
@@ -363,5 +396,39 @@ describe('BookingsService booking transition guard', () => {
     await expect(
       service.refundTransactionByAdmin('tx-404', { reason: 'N/A' }),
     ).rejects.toThrow(NotFoundException);
+  });
+
+  it('lists transactions filtered by current patient profile', async () => {
+    prismaMock.patientProfile.findUnique.mockResolvedValue({ id: 'patient-1' });
+    prismaMock.transaction.findMany.mockResolvedValue([{ id: 'tx-1' }]);
+
+    const result = await service.listTransactions(
+      { sub: 'patient-user-1', email: 'p@mail.com', role: UserRole.PATIENT },
+      { page: 2, limit: 5 },
+    );
+
+    expect(prismaMock.transaction.findMany).toHaveBeenCalledWith({
+      where: { patientId: 'patient-1' },
+      orderBy: { createdAt: 'desc' },
+      skip: 5,
+      take: 5,
+    });
+    expect(result).toEqual([{ id: 'tx-1' }]);
+  });
+
+  it('lists all transactions for admin without patient filter', async () => {
+    prismaMock.transaction.findMany.mockResolvedValue([{ id: 'tx-1' }, { id: 'tx-2' }]);
+
+    const result = await service.listTransactions(
+      { sub: 'admin-user-1', email: 'a@mail.com', role: UserRole.ADMIN },
+      { page: 1, limit: 10 },
+    );
+
+    expect(prismaMock.transaction.findMany).toHaveBeenCalledWith({
+      orderBy: { createdAt: 'desc' },
+      skip: 0,
+      take: 10,
+    });
+    expect(result).toEqual([{ id: 'tx-1' }, { id: 'tx-2' }]);
   });
 });
