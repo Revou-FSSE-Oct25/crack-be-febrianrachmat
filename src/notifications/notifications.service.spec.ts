@@ -31,6 +31,7 @@ describe('NotificationsService', () => {
     jest.clearAllMocks();
   });
 
+  // user notification read flows
   it('lists current user notifications with pagination', async () => {
     prismaMock.$transaction.mockResolvedValue([[{ id: 'n1' }], 11]);
 
@@ -90,6 +91,7 @@ describe('NotificationsService', () => {
     ).rejects.toThrow(NotFoundException);
   });
 
+  // admin send / broadcast flows
   it('sendToUser rejects when target user does not exist', async () => {
     prismaMock.user.findUnique.mockResolvedValue(null);
 
@@ -136,6 +138,7 @@ describe('NotificationsService', () => {
     });
   });
 
+  // helper methods
   it('markAllAsRead updates unread notifications and returns summary', async () => {
     prismaMock.notification.updateMany.mockResolvedValue({ count: 3 });
 

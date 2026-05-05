@@ -29,6 +29,7 @@ describe('AvailabilitySlotsService', () => {
     jest.clearAllMocks();
   });
 
+  // createMine validations
   it('creates slot when window is valid and non-overlapping', async () => {
     prismaMock.physiotherapistProfile.findUnique.mockResolvedValue({
       id: 'therapist-profile-1',
@@ -90,6 +91,7 @@ describe('AvailabilitySlotsService', () => {
     ).rejects.toThrow(BadRequestException);
   });
 
+  // updateMine / removeMine guards
   it('blocks slot window update when active booking exists', async () => {
     prismaMock.physiotherapistProfile.findUnique.mockResolvedValue({
       id: 'therapist-profile-1',
@@ -202,6 +204,7 @@ describe('AvailabilitySlotsService', () => {
     expect(result).toEqual({ message: 'Availability slot deleted.' });
   });
 
+  // list endpoints behavior
   it('builds listMine query with pagination and date range filters', async () => {
     prismaMock.physiotherapistProfile.findUnique.mockResolvedValue({
       id: 'therapist-profile-1',
