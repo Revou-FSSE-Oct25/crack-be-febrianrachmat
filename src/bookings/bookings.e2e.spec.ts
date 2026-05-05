@@ -128,4 +128,37 @@ describe('Bookings listing (e2e-lite)', () => {
       },
     );
   });
+
+  it('GET /transactions returns role-filtered transaction list with pagination params', async () => {
+    bookingsServiceMock.listTransactions.mockResolvedValue([
+      {
+        id: 'tx-1',
+        status: 'PENDING',
+      },
+    ]);
+
+    await request(app.getHttpServer())
+      .get('/transactions?page=3&limit=2')
+      .expect(200)
+      .expect(({ body }) => {
+        expect(body).toEqual([
+          {
+            id: 'tx-1',
+            status: 'PENDING',
+          },
+        ]);
+      });
+
+    expect(bookingsServiceMock.listTransactions).toHaveBeenCalledWith(
+      {
+        sub: 'patient-user-1',
+        email: 'patient@mail.com',
+        role: UserRole.PATIENT,
+      },
+      {
+        page: 3,
+        limit: 2,
+      },
+    );
+  });
 });
