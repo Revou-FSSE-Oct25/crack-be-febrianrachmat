@@ -1,5 +1,14 @@
-import { BadRequestException } from '@nestjs/common';
-import { BookingStatus, ConsultationStatus, UserRole } from '@prisma/client';
+import {
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
+import {
+  BookingStatus,
+  ConsultationStatus,
+  TransactionStatus,
+  UserRole,
+} from '@prisma/client';
 import { BookingsService } from './bookings.service';
 
 describe('BookingsService booking transition guard', () => {
@@ -9,6 +18,7 @@ describe('BookingsService booking transition guard', () => {
     consultation: { findUnique: jest.fn() },
     availabilitySlot: { findUnique: jest.fn() },
     booking: { findUnique: jest.fn() },
+    transaction: { findUnique: jest.fn(), create: jest.fn(), update: jest.fn() },
     $transaction: jest.fn(),
   };
   const notificationsMock = {
@@ -250,5 +260,108 @@ describe('BookingsService booking transition guard', () => {
         },
       ),
     ).rejects.toThrow(BadRequestException);
+  });
+
+  it('creates transaction for own booking only', async () => {
+    prismaMock.patientProfile.findUnique.mockResolvedValue({ id: 'patient-1' });
+    prismaMock.booking.findUnique.mockResolvedValue({
+      id: 'booking-1',
+      patientId: 'patient-1',
+    });
+    prismaMock.transaction.create.mockResolvedValue({ id: 'tx-1' });
+
+    await service.createTransaction(
+      { sub: 'patient-user-1', email: 'p@mail.com', role: UserRole.PATIENT },
+      {
+        bookingId: 'booking-1',
+        amount: 150000,
+        paymentMethod: 'BANK_TRANSFER',
+      },
+    );
+
+    expect(prismaMock.transaction.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          bookingId: 'booking-1',
+          patientId: 'patient-1',
+          status: TransactionStatus.PENDING,
+        }),
+      }),
+    );
+  });
+
+  it('rejects transaction creation when booking is not owned by patient', async () => {
+    prismaMock.patientProfile.findUnique.mockResolvedValue({ id: 'patient-1' });
+    prismaMock.booking.findUnique.mockResolvedValue({
+      id: 'booking-1',
+      patientId: 'patient-2',
+    });
+
+    await expect(
+      service.createTransaction(
+        { sub: 'patient-user-1', email: 'p@mail.com', role: UserRole.PATIENT },
+        {
+          bookingId: 'booking-1',
+          amount: 150000,
+          paymentMethod: 'BANK_TRANSFER',
+        },
+      ),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it('marks own pending transaction as paid', async () => {
+    prismaMock.patientProfile.findUnique.mockResolvedValue({ id: 'patient-1' });
+    prismaMock.transaction.findUnique.mockResolvedValue({
+      id: 'tx-1',
+      patientId: 'patient-1',
+      status: TransactionStatus.PENDING,
+    });
+    prismaMock.transaction.update.mockResolvedValue({
+      id: 'tx-1',
+      status: TransactionStatus.PAID,
+    });
+    notificationsMock.createSystemNotification.mockResolvedValue(undefined);
+
+    await service.markTransactionPaid(
+      { sub: 'patient-user-1', email: 'p@mail.com', role: UserRole.PATIENT },
+      'tx-1',
+    );
+
+    expect(prismaMock.transaction.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'tx-1' },
+        data: expect.objectContaining({
+          status: TransactionStatus.PAID,
+        }),
+      }),
+    );
+  });
+
+  it('rejects mark paid when role is not patient', async () => {
+    await expect(
+      service.markTransactionPaid(
+        { sub: 'admin-user-1', email: 'a@mail.com', role: UserRole.ADMIN },
+        'tx-1',
+      ),
+    ).rejects.toThrow(ForbiddenException);
+  });
+
+  it('rejects refund when transaction is not PAID', async () => {
+    prismaMock.transaction.findUnique.mockResolvedValue({
+      id: 'tx-1',
+      status: TransactionStatus.PENDING,
+    });
+
+    await expect(
+      service.refundTransactionByAdmin('tx-1', { reason: 'Duplicate payment' }),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it('throws not found when refund target transaction does not exist', async () => {
+    prismaMock.transaction.findUnique.mockResolvedValue(null);
+
+    await expect(
+      service.refundTransactionByAdmin('tx-404', { reason: 'N/A' }),
+    ).rejects.toThrow(NotFoundException);
   });
 });
