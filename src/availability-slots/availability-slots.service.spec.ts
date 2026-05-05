@@ -182,4 +182,99 @@ describe('AvailabilitySlotsService', () => {
     });
     expect(result).toEqual({ message: 'Availability slot deleted.' });
   });
+
+  it('builds listMine query with pagination and date range filters', async () => {
+    prismaMock.physiotherapistProfile.findUnique.mockResolvedValue({
+      id: 'therapist-profile-1',
+    });
+    prismaMock.availabilitySlot.findMany.mockResolvedValue([
+      { id: 'slot-1' },
+      { id: 'slot-2' },
+    ]);
+    prismaMock.availabilitySlot.count.mockResolvedValue(12);
+    prismaMock.$transaction.mockResolvedValue([
+      [{ id: 'slot-1' }, { id: 'slot-2' }],
+      12,
+    ]);
+
+    const result = await service.listMine(
+      {
+        sub: 'therapist-user-1',
+        email: 't@mail.com',
+        role: UserRole.PHYSIOTHERAPIST,
+      },
+      {
+        page: 2,
+        limit: 5,
+        from: '2099-06-01',
+        to: '2099-06-30',
+      },
+    );
+
+    expect(prismaMock.availabilitySlot.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        skip: 5,
+        take: 5,
+        where: expect.objectContaining({
+          physiotherapistId: 'therapist-profile-1',
+          slotDate: {
+            gte: new Date('2099-06-01T00:00:00.000Z'),
+            lte: new Date('2099-06-30T00:00:00.000Z'),
+          },
+        }),
+      }),
+    );
+    expect(prismaMock.availabilitySlot.count).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          physiotherapistId: 'therapist-profile-1',
+        }),
+      }),
+    );
+    expect(result).toEqual({
+      page: 2,
+      limit: 5,
+      total: 12,
+      totalPages: 3,
+      items: [{ id: 'slot-1' }, { id: 'slot-2' }],
+    });
+  });
+
+  it('builds public list query with upcoming and available constraints', async () => {
+    prismaMock.physiotherapistProfile.findUnique.mockResolvedValue({
+      id: 'therapist-profile-1',
+      verificationStatus: TherapistVerificationStatus.APPROVED,
+    });
+    prismaMock.$transaction.mockResolvedValue([[{ id: 'slot-1' }], 1]);
+
+    const result = await service.listForTherapistProfile(
+      'therapist-profile-1',
+      {
+        page: 1,
+        limit: 10,
+        from: '2099-06-01',
+      },
+    );
+
+    const findManyCallArg = prismaMock.availabilitySlot.findMany.mock.calls[0][0];
+    expect(findManyCallArg.where).toEqual(
+      expect.objectContaining({
+        physiotherapistId: 'therapist-profile-1',
+        isAvailable: true,
+        slotDate: {
+          gte: new Date('2099-06-01T00:00:00.000Z'),
+        },
+      }),
+    );
+    expect(findManyCallArg.where.endTime).toEqual(
+      expect.objectContaining({ gte: expect.any(Date) }),
+    );
+    expect(result).toEqual({
+      page: 1,
+      limit: 10,
+      total: 1,
+      totalPages: 1,
+      items: [{ id: 'slot-1' }],
+    });
+  });
 });
