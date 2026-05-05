@@ -285,6 +285,17 @@ describe('BookingsService booking transition guard', () => {
     expect(result).toEqual([{ id: 'consult-1' }]);
   });
 
+  it('rejects listMyConsultations for PATIENT when patient profile is missing', async () => {
+    prismaMock.patientProfile.findUnique.mockResolvedValue(null);
+
+    await expect(
+      service.listMyConsultations(
+        { sub: 'patient-user-1', email: 'p@mail.com', role: UserRole.PATIENT },
+        { page: 1, limit: 10 },
+      ),
+    ).rejects.toThrow(BadRequestException);
+  });
+
   it('lists bookings for therapist based on therapist profile id', async () => {
     prismaMock.physiotherapistProfile.findUnique.mockResolvedValue({
       id: 'therapist-1',
@@ -307,6 +318,21 @@ describe('BookingsService booking transition guard', () => {
       take: 10,
     });
     expect(result).toEqual([{ id: 'book-1' }]);
+  });
+
+  it('rejects listMyBookings for PHYSIOTHERAPIST when profile is missing', async () => {
+    prismaMock.physiotherapistProfile.findUnique.mockResolvedValue(null);
+
+    await expect(
+      service.listMyBookings(
+        {
+          sub: 'therapist-user-1',
+          email: 't@mail.com',
+          role: UserRole.PHYSIOTHERAPIST,
+        },
+        { page: 1, limit: 10 },
+      ),
+    ).rejects.toThrow(BadRequestException);
   });
 
   it('creates transaction for own booking only', async () => {
