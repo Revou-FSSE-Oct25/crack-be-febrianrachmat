@@ -6,6 +6,7 @@ import { AppModule } from './app.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './auth/guards/roles.guard';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
+import { TransformResponseInterceptor } from './common/interceptors/transform-response.interceptor';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
@@ -19,6 +20,7 @@ async function bootstrap(): Promise<void> {
     }),
   );
   app.useGlobalFilters(new GlobalExceptionFilter());
+  app.useGlobalInterceptors(new TransformResponseInterceptor());
 
   // These guards are global, so every endpoint is protected by default.
   // Public endpoints must explicitly use @Public() decorator.
