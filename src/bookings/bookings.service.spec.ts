@@ -335,6 +335,38 @@ describe('BookingsService booking transition guard', () => {
     ).rejects.toThrow(BadRequestException);
   });
 
+  it('lists all consultations for admin without ownership filter', async () => {
+    prismaMock.consultation.findMany.mockResolvedValue([{ id: 'consult-admin-1' }]);
+
+    const result = await service.listMyConsultations(
+      { sub: 'admin-user-1', email: 'a@mail.com', role: UserRole.ADMIN },
+      { page: 1, limit: 10 },
+    );
+
+    expect(prismaMock.consultation.findMany).toHaveBeenCalledWith({
+      orderBy: { createdAt: 'desc' },
+      skip: 0,
+      take: 10,
+    });
+    expect(result).toEqual([{ id: 'consult-admin-1' }]);
+  });
+
+  it('lists all bookings for admin without ownership filter', async () => {
+    prismaMock.booking.findMany.mockResolvedValue([{ id: 'booking-admin-1' }]);
+
+    const result = await service.listMyBookings(
+      { sub: 'admin-user-1', email: 'a@mail.com', role: UserRole.ADMIN },
+      { page: 3, limit: 5 },
+    );
+
+    expect(prismaMock.booking.findMany).toHaveBeenCalledWith({
+      orderBy: { appointmentDate: 'desc' },
+      skip: 10,
+      take: 5,
+    });
+    expect(result).toEqual([{ id: 'booking-admin-1' }]);
+  });
+
   it('creates transaction for own booking only', async () => {
     prismaMock.patientProfile.findUnique.mockResolvedValue({ id: 'patient-1' });
     prismaMock.booking.findUnique.mockResolvedValue({
