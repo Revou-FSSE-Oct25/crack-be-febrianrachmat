@@ -75,6 +75,28 @@ describe('AvailabilitySlotsService', () => {
     ).rejects.toThrow(BadRequestException);
   });
 
+  it('rejects create when slot overlaps existing availability', async () => {
+    prismaMock.physiotherapistProfile.findUnique.mockResolvedValue({
+      id: 'therapist-profile-1',
+    });
+    prismaMock.availabilitySlot.findFirst.mockResolvedValue({ id: 'existing-slot' });
+
+    await expect(
+      service.createMine(
+        {
+          sub: 'therapist-user-1',
+          email: 't@mail.com',
+          role: UserRole.PHYSIOTHERAPIST,
+        },
+        {
+          slotDate: '2099-06-01',
+          startTime: '2099-06-01T09:30:00.000Z',
+          endTime: '2099-06-01T10:30:00.000Z',
+        },
+      ),
+    ).rejects.toThrow(BadRequestException);
+  });
+
   it('blocks slot window update when active booking exists', async () => {
     prismaMock.physiotherapistProfile.findUnique.mockResolvedValue({
       id: 'therapist-profile-1',
@@ -98,6 +120,33 @@ describe('AvailabilitySlotsService', () => {
         },
         'slot-1',
         { startTime: '2099-06-01T11:00:00.000Z' },
+      ),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it('rejects setting isAvailable=true when slot has blocking booking', async () => {
+    prismaMock.physiotherapistProfile.findUnique.mockResolvedValue({
+      id: 'therapist-profile-1',
+    });
+    prismaMock.availabilitySlot.findUnique.mockResolvedValue({
+      id: 'slot-1',
+      physiotherapistId: 'therapist-profile-1',
+      slotDate: new Date('2099-06-01T00:00:00.000Z'),
+      startTime: new Date('2099-06-01T09:00:00.000Z'),
+      endTime: new Date('2099-06-01T10:00:00.000Z'),
+      isAvailable: false,
+    });
+    prismaMock.booking.count.mockResolvedValue(2);
+
+    await expect(
+      service.updateMine(
+        {
+          sub: 'therapist-user-1',
+          email: 't@mail.com',
+          role: UserRole.PHYSIOTHERAPIST,
+        },
+        'slot-1',
+        { isAvailable: true },
       ),
     ).rejects.toThrow(BadRequestException);
   });
