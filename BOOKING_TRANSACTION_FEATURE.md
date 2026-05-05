@@ -51,6 +51,7 @@ Update booking status:
 
 If booking is cancelled, linked slot is released to available again.
 Valid transition flow: `PENDING -> CONFIRMED -> IN_PROGRESS -> COMPLETED` and cancel is only allowed before completion.
+Unit test coverage for this transition guard is available in `src/bookings/bookings.service.spec.ts`.
 
 ## Dummy Transaction Endpoints
 
