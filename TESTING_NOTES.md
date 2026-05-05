@@ -33,6 +33,8 @@ Quick map of automated test coverage currently available in this repository.
   - Role-based listing behavior for patient/therapist/admin.
   - Transaction flow checks (create, pay, refund guards).
   - Notification failure tolerance (core flow still succeeds).
+- `src/bookings/bookings.controller.spec.ts`
+  - Controller delegation coverage for key consultation/booking/transaction endpoints.
 
 ### Availability slots domain
 
@@ -40,6 +42,8 @@ Quick map of automated test coverage currently available in this repository.
   - Slot creation validation (date window + overlap guard).
   - Update and delete guards when active bookings exist.
   - Listing behavior (pagination, date filters, upcoming + available constraints).
+- `src/availability-slots/availability-slots.controller.spec.ts`
+  - Controller delegation coverage for create/list/update/delete/profile-list endpoints.
 
 ### Notifications domain
 
@@ -48,10 +52,11 @@ Quick map of automated test coverage currently available in this repository.
   - Ownership checks for mark-as-read.
   - Admin send/broadcast behaviors.
   - System notification helper behavior.
+- `src/notifications/notifications.controller.spec.ts`
+  - Controller delegation coverage for list/read/read-all/send/broadcast endpoints.
 
 ## Known test gaps (next candidates)
 
-- Controller-level tests for key modules (`bookings`, `availability-slots`, `notifications`).
 - Integration/e2e flow tests across modules:
   - auth -> create slot -> create booking -> transaction -> notification.
 - Negative-path tests for more role/ownership edge cases in controller layer.
