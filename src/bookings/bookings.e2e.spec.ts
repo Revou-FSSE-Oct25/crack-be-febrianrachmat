@@ -95,4 +95,37 @@ describe('Bookings listing (e2e-lite)', () => {
       },
     );
   });
+
+  it('GET /consultations/me returns role-filtered consultation list with pagination params', async () => {
+    bookingsServiceMock.listMyConsultations.mockResolvedValue([
+      {
+        id: 'consultation-1',
+        status: 'REQUESTED',
+      },
+    ]);
+
+    await request(app.getHttpServer())
+      .get('/consultations/me?page=1&limit=10')
+      .expect(200)
+      .expect(({ body }) => {
+        expect(body).toEqual([
+          {
+            id: 'consultation-1',
+            status: 'REQUESTED',
+          },
+        ]);
+      });
+
+    expect(bookingsServiceMock.listMyConsultations).toHaveBeenCalledWith(
+      {
+        sub: 'patient-user-1',
+        email: 'patient@mail.com',
+        role: UserRole.PATIENT,
+      },
+      {
+        page: 1,
+        limit: 10,
+      },
+    );
+  });
 });
