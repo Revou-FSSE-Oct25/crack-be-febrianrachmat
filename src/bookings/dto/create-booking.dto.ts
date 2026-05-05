@@ -3,10 +3,12 @@ import { Type } from 'class-transformer';
 import {
   IsDateString,
   IsEnum,
+  IsNotEmpty,
   IsOptional,
   IsString,
   IsUUID,
   MinLength,
+  ValidateIf,
 } from 'class-validator';
 
 export class CreateBookingDto {
@@ -24,6 +26,8 @@ export class CreateBookingDto {
   @IsEnum(AppointmentType)
   appointmentType!: AppointmentType;
 
+  @ValidateIf((o: CreateBookingDto) => !o.slotId)
+  @IsNotEmpty()
   @IsDateString()
   @Type(() => String)
   appointmentDate!: string;

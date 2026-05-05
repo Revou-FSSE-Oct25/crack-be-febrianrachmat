@@ -34,6 +34,10 @@ Rules:
 - `CLINIC_VISIT` requires `clinicAddress`
 - `HOME_VISIT` requires `homeVisitAddress`
 - Optional `slotId` must belong to selected therapist and be available
+- If `slotId` is provided, `appointmentDate` is synchronized to slot `startTime`
+- If both `slotId` and `appointmentDate` are provided, they must match exactly
+- If `slotId` is not provided, `appointmentDate` is required
+- Booking from consultation is blocked when consultation status is `REJECTED` or `CANCELLED`
 - If slot is used, it becomes unavailable
 
 ### `GET /bookings/me` (Roles: `ADMIN`, `PATIENT`, `PHYSIOTHERAPIST`)

@@ -221,6 +221,26 @@ export class BookingsService {
       if (!consultation || consultation.patientId !== patient.id) {
         throw new BadRequestException('consultationId is invalid for this patient.');
       }
+      if (consultation.physiotherapistId !== dto.physiotherapistId) {
+        throw new BadRequestException(
+          'consultationId does not match the selected physiotherapist.',
+        );
+      }
+      if (
+        consultation.status === ConsultationStatus.REJECTED ||
+        consultation.status === ConsultationStatus.CANCELLED
+      ) {
+        throw new BadRequestException(
+          `Cannot create booking from consultation with status ${consultation.status}.`,
+        );
+      }
+    }
+
+    let appointmentDate = dto.appointmentDate
+      ? new Date(dto.appointmentDate)
+      : undefined;
+    if (appointmentDate && Number.isNaN(appointmentDate.getTime())) {
+      throw new BadRequestException('appointmentDate is invalid.');
     }
 
     if (dto.slotId) {
@@ -233,7 +253,24 @@ export class BookingsService {
       if (!slot.isAvailable) {
         throw new BadRequestException('Selected slot is no longer available.');
       }
+      if (slot.endTime <= new Date()) {
+        throw new BadRequestException('Selected slot has already passed.');
+      }
+      if (
+        appointmentDate &&
+        appointmentDate.getTime() !== slot.startTime.getTime()
+      ) {
+        throw new BadRequestException(
+          'appointmentDate must equal slot startTime when slotId is provided.',
+        );
+      }
+      appointmentDate = slot.startTime;
+    } else if (!appointmentDate) {
+      throw new BadRequestException(
+        'appointmentDate is required when slotId is not provided.',
+      );
     }
+    const resolvedAppointmentDate = appointmentDate as Date;
 
     const booking = await this.prisma.$transaction(async (tx) => {
       const booking = await tx.booking.create({
@@ -243,7 +280,7 @@ export class BookingsService {
           physiotherapistId: dto.physiotherapistId,
           slotId: dto.slotId,
           appointmentType: dto.appointmentType,
-          appointmentDate: new Date(dto.appointmentDate),
+          appointmentDate: resolvedAppointmentDate,
           clinicAddress: dto.clinicAddress,
           homeVisitAddress: dto.homeVisitAddress,
           notes: dto.notes,
