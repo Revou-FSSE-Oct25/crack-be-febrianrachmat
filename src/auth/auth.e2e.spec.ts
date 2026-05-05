@@ -1,4 +1,9 @@
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import {
+  CanActivate,
+  ExecutionContext,
+  INestApplication,
+  ValidationPipe,
+} from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { UserRole } from '@prisma/client';
 import * as request from 'supertest';
@@ -7,6 +12,17 @@ import { AuthService } from './auth.service';
 
 describe('Auth public endpoints (e2e-lite)', () => {
   let app: INestApplication;
+  class MockAuthGuard implements CanActivate {
+    canActivate(context: ExecutionContext): boolean {
+      const req = context.switchToHttp().getRequest();
+      req.user = {
+        sub: 'user-guard-1',
+        email: 'guard@mail.com',
+        role: UserRole.PATIENT,
+      };
+      return true;
+    }
+  }
   const authServiceMock = {
     register: jest.fn(),
     login: jest.fn(),
@@ -26,6 +42,7 @@ describe('Auth public endpoints (e2e-lite)', () => {
         transform: true,
       }),
     );
+    app.useGlobalGuards(new MockAuthGuard());
     await app.init();
   });
 
@@ -79,6 +96,19 @@ describe('Auth public endpoints (e2e-lite)', () => {
         expect(body).toEqual({
           accessToken: 'jwt-token',
           user: { id: 'user-1', role: UserRole.PATIENT },
+        });
+      });
+  });
+
+  it('GET /auth/me returns current request user payload', async () => {
+    await request(app.getHttpServer())
+      .get('/auth/me')
+      .expect(200)
+      .expect(({ body }) => {
+        expect(body).toEqual({
+          sub: 'user-guard-1',
+          email: 'guard@mail.com',
+          role: UserRole.PATIENT,
         });
       });
   });
