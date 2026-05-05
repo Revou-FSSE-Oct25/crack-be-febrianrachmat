@@ -33,6 +33,21 @@ describe('BookingsService booking transition guard', () => {
     prismaMock as never,
     notificationsMock as never,
   );
+  const PATIENT_USER = {
+    sub: 'patient-user-1',
+    email: 'p@mail.com',
+    role: UserRole.PATIENT,
+  };
+  const THERAPIST_USER = {
+    sub: 'therapist-user-1',
+    email: 't@mail.com',
+    role: UserRole.PHYSIOTHERAPIST,
+  };
+  const ADMIN_USER = {
+    sub: 'admin-user-1',
+    email: 'a@mail.com',
+    role: UserRole.ADMIN,
+  };
   const callAssertTransition = (
     currentStatus: BookingStatus,
     nextStatus: BookingStatus,
@@ -97,7 +112,7 @@ describe('BookingsService booking transition guard', () => {
     );
 
     await service.createBooking(
-      { sub: 'patient-user-1', email: 'p@mail.com', role: UserRole.PATIENT },
+      PATIENT_USER,
       {
         physiotherapistId: 'therapist-1',
         slotId: 'slot-1',
@@ -137,7 +152,7 @@ describe('BookingsService booking transition guard', () => {
 
     await expect(
       service.createBooking(
-        { sub: 'patient-user-1', email: 'p@mail.com', role: UserRole.PATIENT },
+        PATIENT_USER,
         {
           physiotherapistId: 'therapist-1',
           slotId: 'slot-1',
@@ -171,11 +186,9 @@ describe('BookingsService booking transition guard', () => {
         }),
     );
 
-    await service.updateBookingStatus(
-      { sub: 'admin-user-1', email: 'admin@mail.com', role: UserRole.ADMIN },
-      'booking-1',
-      { status: BookingStatus.CANCELLED },
-    );
+    await service.updateBookingStatus(ADMIN_USER, 'booking-1', {
+      status: BookingStatus.CANCELLED,
+    });
 
     expect(txSlotUpdate).toHaveBeenCalledWith({
       where: { id: 'slot-1' },
@@ -199,7 +212,7 @@ describe('BookingsService booking transition guard', () => {
 
     await expect(
       service.createBooking(
-        { sub: 'patient-user-1', email: 'p@mail.com', role: UserRole.PATIENT },
+        PATIENT_USER,
         {
           consultationId: 'consultation-1',
           physiotherapistId: 'therapist-1',
@@ -227,7 +240,7 @@ describe('BookingsService booking transition guard', () => {
 
     await expect(
       service.createBooking(
-        { sub: 'patient-user-1', email: 'p@mail.com', role: UserRole.PATIENT },
+        PATIENT_USER,
         {
           consultationId: 'consultation-1',
           physiotherapistId: 'therapist-1',
@@ -255,7 +268,7 @@ describe('BookingsService booking transition guard', () => {
 
     await expect(
       service.createBooking(
-        { sub: 'patient-user-1', email: 'p@mail.com', role: UserRole.PATIENT },
+        PATIENT_USER,
         {
           consultationId: 'consultation-1',
           physiotherapistId: 'therapist-1',
@@ -271,10 +284,10 @@ describe('BookingsService booking transition guard', () => {
     prismaMock.patientProfile.findUnique.mockResolvedValue({ id: 'patient-1' });
     prismaMock.consultation.findMany.mockResolvedValue([{ id: 'consult-1' }]);
 
-    const result = await service.listMyConsultations(
-      { sub: 'patient-user-1', email: 'p@mail.com', role: UserRole.PATIENT },
-      { page: 2, limit: 5 },
-    );
+    const result = await service.listMyConsultations(PATIENT_USER, {
+      page: 2,
+      limit: 5,
+    });
 
     expect(prismaMock.consultation.findMany).toHaveBeenCalledWith({
       where: { patientId: 'patient-1' },
@@ -289,10 +302,7 @@ describe('BookingsService booking transition guard', () => {
     prismaMock.patientProfile.findUnique.mockResolvedValue(null);
 
     await expect(
-      service.listMyConsultations(
-        { sub: 'patient-user-1', email: 'p@mail.com', role: UserRole.PATIENT },
-        { page: 1, limit: 10 },
-      ),
+      service.listMyConsultations(PATIENT_USER, { page: 1, limit: 10 }),
     ).rejects.toThrow(BadRequestException);
   });
 
@@ -302,14 +312,10 @@ describe('BookingsService booking transition guard', () => {
     });
     prismaMock.booking.findMany.mockResolvedValue([{ id: 'book-1' }]);
 
-    const result = await service.listMyBookings(
-      {
-        sub: 'therapist-user-1',
-        email: 't@mail.com',
-        role: UserRole.PHYSIOTHERAPIST,
-      },
-      { page: 1, limit: 10 },
-    );
+    const result = await service.listMyBookings(THERAPIST_USER, {
+      page: 1,
+      limit: 10,
+    });
 
     expect(prismaMock.booking.findMany).toHaveBeenCalledWith({
       where: { physiotherapistId: 'therapist-1' },
@@ -324,24 +330,17 @@ describe('BookingsService booking transition guard', () => {
     prismaMock.physiotherapistProfile.findUnique.mockResolvedValue(null);
 
     await expect(
-      service.listMyBookings(
-        {
-          sub: 'therapist-user-1',
-          email: 't@mail.com',
-          role: UserRole.PHYSIOTHERAPIST,
-        },
-        { page: 1, limit: 10 },
-      ),
+      service.listMyBookings(THERAPIST_USER, { page: 1, limit: 10 }),
     ).rejects.toThrow(BadRequestException);
   });
 
   it('lists all consultations for admin without ownership filter', async () => {
     prismaMock.consultation.findMany.mockResolvedValue([{ id: 'consult-admin-1' }]);
 
-    const result = await service.listMyConsultations(
-      { sub: 'admin-user-1', email: 'a@mail.com', role: UserRole.ADMIN },
-      { page: 1, limit: 10 },
-    );
+    const result = await service.listMyConsultations(ADMIN_USER, {
+      page: 1,
+      limit: 10,
+    });
 
     expect(prismaMock.consultation.findMany).toHaveBeenCalledWith({
       orderBy: { createdAt: 'desc' },
@@ -354,10 +353,10 @@ describe('BookingsService booking transition guard', () => {
   it('lists all bookings for admin without ownership filter', async () => {
     prismaMock.booking.findMany.mockResolvedValue([{ id: 'booking-admin-1' }]);
 
-    const result = await service.listMyBookings(
-      { sub: 'admin-user-1', email: 'a@mail.com', role: UserRole.ADMIN },
-      { page: 3, limit: 5 },
-    );
+    const result = await service.listMyBookings(ADMIN_USER, {
+      page: 3,
+      limit: 5,
+    });
 
     expect(prismaMock.booking.findMany).toHaveBeenCalledWith({
       orderBy: { appointmentDate: 'desc' },
@@ -376,7 +375,7 @@ describe('BookingsService booking transition guard', () => {
     prismaMock.transaction.create.mockResolvedValue({ id: 'tx-1' });
 
     await service.createTransaction(
-      { sub: 'patient-user-1', email: 'p@mail.com', role: UserRole.PATIENT },
+      PATIENT_USER,
       {
         bookingId: 'booking-1',
         amount: 150000,
@@ -404,7 +403,7 @@ describe('BookingsService booking transition guard', () => {
 
     await expect(
       service.createTransaction(
-        { sub: 'patient-user-1', email: 'p@mail.com', role: UserRole.PATIENT },
+        PATIENT_USER,
         {
           bookingId: 'booking-1',
           amount: 150000,
@@ -427,10 +426,7 @@ describe('BookingsService booking transition guard', () => {
     });
     notificationsMock.createSystemNotification.mockResolvedValue(undefined);
 
-    await service.markTransactionPaid(
-      { sub: 'patient-user-1', email: 'p@mail.com', role: UserRole.PATIENT },
-      'tx-1',
-    );
+    await service.markTransactionPaid(PATIENT_USER, 'tx-1');
 
     expect(prismaMock.transaction.update).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -458,10 +454,7 @@ describe('BookingsService booking transition guard', () => {
     );
 
     await expect(
-      service.markTransactionPaid(
-        { sub: 'patient-user-1', email: 'p@mail.com', role: UserRole.PATIENT },
-        'tx-1',
-      ),
+      service.markTransactionPaid(PATIENT_USER, 'tx-1'),
     ).resolves.toEqual(
       expect.objectContaining({
         id: 'tx-1',
@@ -472,10 +465,7 @@ describe('BookingsService booking transition guard', () => {
 
   it('rejects mark paid when role is not patient', async () => {
     await expect(
-      service.markTransactionPaid(
-        { sub: 'admin-user-1', email: 'a@mail.com', role: UserRole.ADMIN },
-        'tx-1',
-      ),
+      service.markTransactionPaid(ADMIN_USER, 'tx-1'),
     ).rejects.toThrow(ForbiddenException);
   });
 
@@ -502,10 +492,10 @@ describe('BookingsService booking transition guard', () => {
     prismaMock.patientProfile.findUnique.mockResolvedValue({ id: 'patient-1' });
     prismaMock.transaction.findMany.mockResolvedValue([{ id: 'tx-1' }]);
 
-    const result = await service.listTransactions(
-      { sub: 'patient-user-1', email: 'p@mail.com', role: UserRole.PATIENT },
-      { page: 2, limit: 5 },
-    );
+    const result = await service.listTransactions(PATIENT_USER, {
+      page: 2,
+      limit: 5,
+    });
 
     expect(prismaMock.transaction.findMany).toHaveBeenCalledWith({
       where: { patientId: 'patient-1' },
@@ -519,10 +509,10 @@ describe('BookingsService booking transition guard', () => {
   it('lists all transactions for admin without patient filter', async () => {
     prismaMock.transaction.findMany.mockResolvedValue([{ id: 'tx-1' }, { id: 'tx-2' }]);
 
-    const result = await service.listTransactions(
-      { sub: 'admin-user-1', email: 'a@mail.com', role: UserRole.ADMIN },
-      { page: 1, limit: 10 },
-    );
+    const result = await service.listTransactions(ADMIN_USER, {
+      page: 1,
+      limit: 10,
+    });
 
     expect(prismaMock.transaction.findMany).toHaveBeenCalledWith({
       orderBy: { createdAt: 'desc' },
