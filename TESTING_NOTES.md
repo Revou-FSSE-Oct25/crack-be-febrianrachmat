@@ -40,6 +40,8 @@ Quick map of automated test coverage currently available in this repository.
   - Notification failure tolerance (core flow still succeeds).
 - `src/bookings/bookings.controller.spec.ts`
   - Controller delegation coverage for key consultation/booking/transaction endpoints.
+- `src/bookings/bookings.e2e.spec.ts`
+  - E2E-lite smoke coverage for protected booking list endpoint (`GET /bookings/me`) with auth guard mock and pagination forwarding checks.
 
 ### Availability slots domain
 
