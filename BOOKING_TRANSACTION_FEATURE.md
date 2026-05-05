@@ -47,9 +47,10 @@ List bookings by current actor.
 Update booking status:
 - `PHYSIOTHERAPIST`: `CONFIRMED`, `IN_PROGRESS`, `COMPLETED`
 - `PATIENT`: `CANCELLED`
-- `ADMIN`: unrestricted override
+- `ADMIN`: can set any target status, but still must follow transition flow
 
 If booking is cancelled, linked slot is released to available again.
+Valid transition flow: `PENDING -> CONFIRMED -> IN_PROGRESS -> COMPLETED` and cancel is only allowed before completion.
 
 ## Dummy Transaction Endpoints
 

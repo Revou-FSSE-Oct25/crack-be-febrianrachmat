@@ -26,6 +26,17 @@ import { UpdateConsultationStatusDto } from './dto/update-consultation-status.dt
 
 @Injectable()
 export class BookingsService {
+  private readonly allowedBookingTransitions: Record<
+    BookingStatus,
+    BookingStatus[]
+  > = {
+    [BookingStatus.PENDING]: [BookingStatus.CONFIRMED, BookingStatus.CANCELLED],
+    [BookingStatus.CONFIRMED]: [BookingStatus.IN_PROGRESS, BookingStatus.CANCELLED],
+    [BookingStatus.IN_PROGRESS]: [BookingStatus.COMPLETED, BookingStatus.CANCELLED],
+    [BookingStatus.COMPLETED]: [],
+    [BookingStatus.CANCELLED]: [],
+  };
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly notificationsService: NotificationsService,
@@ -351,6 +362,7 @@ export class BookingsService {
       where: { id: bookingId },
     });
     if (!booking) throw new NotFoundException('Booking not found.');
+    this.assertValidBookingTransition(booking.status, dto.status);
 
     if (authUser.role === UserRole.PHYSIOTHERAPIST) {
       const therapist = await this.prisma.physiotherapistProfile.findUnique({
@@ -415,6 +427,24 @@ export class BookingsService {
     }
 
     return updated;
+  }
+
+  private assertValidBookingTransition(
+    currentStatus: BookingStatus,
+    nextStatus: BookingStatus,
+  ): void {
+    if (currentStatus === nextStatus) {
+      throw new BadRequestException(
+        `Booking status is already ${currentStatus}.`,
+      );
+    }
+
+    const allowedNext = this.allowedBookingTransitions[currentStatus] ?? [];
+    if (!allowedNext.includes(nextStatus)) {
+      throw new BadRequestException(
+        `Invalid booking status transition from ${currentStatus} to ${nextStatus}.`,
+      );
+    }
   }
 
   async createTransaction(authUser: AuthUser, dto: CreateTransactionDto) {
