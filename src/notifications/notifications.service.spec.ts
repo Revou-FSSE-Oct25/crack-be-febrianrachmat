@@ -21,6 +21,11 @@ describe('NotificationsService', () => {
   };
 
   const service = new NotificationsService(prismaMock as never);
+  const PATIENT_USER = {
+    sub: 'user-1',
+    email: 'u@mail.com',
+    role: UserRole.PATIENT,
+  };
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -29,10 +34,10 @@ describe('NotificationsService', () => {
   it('lists current user notifications with pagination', async () => {
     prismaMock.$transaction.mockResolvedValue([[{ id: 'n1' }], 11]);
 
-    const result = await service.listMyNotifications(
-      { sub: 'user-1', email: 'u@mail.com', role: UserRole.PATIENT },
-      { page: 2, limit: 5 },
-    );
+    const result = await service.listMyNotifications(PATIENT_USER, {
+      page: 2,
+      limit: 5,
+    });
 
     expect(prismaMock.notification.findMany).toHaveBeenCalledWith({
       where: { userId: 'user-1' },
@@ -61,10 +66,7 @@ describe('NotificationsService', () => {
       isRead: true,
     });
 
-    const result = await service.markAsRead(
-      { sub: 'user-1', email: 'u@mail.com', role: UserRole.PATIENT },
-      'n1',
-    );
+    const result = await service.markAsRead(PATIENT_USER, 'n1');
 
     expect(prismaMock.notification.update).toHaveBeenCalledWith({
       where: { id: 'n1' },
@@ -84,10 +86,7 @@ describe('NotificationsService', () => {
     });
 
     await expect(
-      service.markAsRead(
-        { sub: 'user-1', email: 'u@mail.com', role: UserRole.PATIENT },
-        'n1',
-      ),
+      service.markAsRead(PATIENT_USER, 'n1'),
     ).rejects.toThrow(NotFoundException);
   });
 
@@ -140,11 +139,7 @@ describe('NotificationsService', () => {
   it('markAllAsRead updates unread notifications and returns summary', async () => {
     prismaMock.notification.updateMany.mockResolvedValue({ count: 3 });
 
-    const result = await service.markAllAsRead({
-      sub: 'user-1',
-      email: 'u@mail.com',
-      role: UserRole.PATIENT,
-    });
+    const result = await service.markAllAsRead(PATIENT_USER);
 
     expect(prismaMock.notification.updateMany).toHaveBeenCalledWith({
       where: { userId: 'user-1', isRead: false },
