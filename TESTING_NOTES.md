@@ -41,7 +41,7 @@ Quick map of automated test coverage currently available in this repository.
 - `src/bookings/bookings.controller.spec.ts`
   - Controller delegation coverage for key consultation/booking/transaction endpoints.
 - `src/bookings/bookings.e2e.spec.ts`
-  - E2E-lite smoke coverage for protected listing endpoints (`GET /bookings/me`, `GET /consultations/me`) with auth guard mock and pagination forwarding checks.
+  - E2E-lite smoke coverage for protected listing endpoints (`GET /bookings/me`, `GET /consultations/me`, `GET /transactions`) with auth guard mock and pagination forwarding checks.
 
 ### Availability slots domain
 
