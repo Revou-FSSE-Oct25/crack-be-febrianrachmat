@@ -49,6 +49,8 @@ Quick map of automated test coverage currently available in this repository.
   - Listing behavior (pagination, date filters, upcoming + available constraints).
 - `src/availability-slots/availability-slots.controller.spec.ts`
   - Controller delegation coverage for create/list/update/delete/profile-list endpoints.
+- `src/availability-slots/availability-slots.e2e.spec.ts`
+  - E2E-lite smoke coverage for public slot listing endpoint (`GET /physiotherapists/:profileId/availability-slots`) with auth guard mock and query forwarding checks.
 
 ### Notifications domain
 
