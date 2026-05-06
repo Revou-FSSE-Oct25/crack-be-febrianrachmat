@@ -9,6 +9,7 @@ Quick map of automated test coverage currently available in this repository.
 - Run real integration tests (no service mocks): `npm run test:integration`
 - Run unit + integration sequentially (recommended): `npm run test:all`
 - Run unit test coverage report: `npm run test:cov`
+- Seed demo data locally: `npm run prisma:seed`
 
 ## Latest local results (example)
 

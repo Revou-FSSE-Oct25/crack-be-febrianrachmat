@@ -68,7 +68,7 @@ Legend:
 - [x] Uses relational DB (PostgreSQL).
 - [x] At least 3 entities with valid relationships.
 - [x] ERD exists (tables, relationships, keys/constraints).
-- [~] Seed/sample data is meaningful (not placeholder only).
+- [x] Seed/sample data is meaningful (not placeholder only).
 
 ---
 
