@@ -908,5 +908,94 @@ describe('Core integration (real DB, no service mocks)', () => {
       expect(res.body.error.code).toBe(403);
       expect(res.body.error.message).toBe('You can only update your own bookings.');
     });
+
+    it("returns 404 when therapist A updates therapist B's availability slot", async () => {
+      const therapistARegisterRes = await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({
+          fullName: 'Therapist Slot Owner A',
+          email: 'therapist-slot-owner-a@mail.com',
+          password: 'password123',
+          role: UserRole.PHYSIOTHERAPIST,
+        })
+        .expect(201);
+      const therapistAToken = (therapistARegisterRes.body as AuthResponse).data.accessToken;
+
+      const therapistBRegisterRes = await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({
+          fullName: 'Therapist Slot Owner B',
+          email: 'therapist-slot-owner-b@mail.com',
+          password: 'password123',
+          role: UserRole.PHYSIOTHERAPIST,
+        })
+        .expect(201);
+      const therapistBToken = (therapistBRegisterRes.body as AuthResponse).data.accessToken;
+
+      const slotRes = await request(app.getHttpServer())
+        .post('/physiotherapists/me/availability-slots')
+        .set('Authorization', `Bearer ${therapistBToken}`)
+        .send({
+          slotDate: '2099-12-20',
+          startTime: '2099-12-20T09:00:00.000Z',
+          endTime: '2099-12-20T10:00:00.000Z',
+        })
+        .expect(201);
+      const slotId = (slotRes.body as ApiEnvelope<{ id: string }>).data.id;
+
+      const res = await request(app.getHttpServer())
+        .patch(`/physiotherapists/me/availability-slots/${slotId}`)
+        .set('Authorization', `Bearer ${therapistAToken}`)
+        .send({ isAvailable: false })
+        .expect(404);
+
+      expect(res.body.success).toBe(false);
+      expect(res.body.error.code).toBe(404);
+      expect(res.body.error.message).toBe('Availability slot not found.');
+    });
+
+    it("returns 404 when therapist A deletes therapist B's availability slot", async () => {
+      const therapistARegisterRes = await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({
+          fullName: 'Therapist Slot Delete A',
+          email: 'therapist-slot-delete-a@mail.com',
+          password: 'password123',
+          role: UserRole.PHYSIOTHERAPIST,
+        })
+        .expect(201);
+      const therapistAToken = (therapistARegisterRes.body as AuthResponse).data.accessToken;
+
+      const therapistBRegisterRes = await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({
+          fullName: 'Therapist Slot Delete B',
+          email: 'therapist-slot-delete-b@mail.com',
+          password: 'password123',
+          role: UserRole.PHYSIOTHERAPIST,
+        })
+        .expect(201);
+      const therapistBToken = (therapistBRegisterRes.body as AuthResponse).data.accessToken;
+
+      const slotRes = await request(app.getHttpServer())
+        .post('/physiotherapists/me/availability-slots')
+        .set('Authorization', `Bearer ${therapistBToken}`)
+        .send({
+          slotDate: '2099-12-21',
+          startTime: '2099-12-21T09:00:00.000Z',
+          endTime: '2099-12-21T10:00:00.000Z',
+        })
+        .expect(201);
+      const slotId = (slotRes.body as ApiEnvelope<{ id: string }>).data.id;
+
+      const res = await request(app.getHttpServer())
+        .delete(`/physiotherapists/me/availability-slots/${slotId}`)
+        .set('Authorization', `Bearer ${therapistAToken}`)
+        .expect(404);
+
+      expect(res.body.success).toBe(false);
+      expect(res.body.error.code).toBe(404);
+      expect(res.body.error.message).toBe('Availability slot not found.');
+    });
   });
 });
