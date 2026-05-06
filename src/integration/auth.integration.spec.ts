@@ -681,5 +681,84 @@ describe('Core integration (real DB, no service mocks)', () => {
         'You can only update your own consultations.',
       );
     });
+
+    it("returns 404 when patient A pays patient B's transaction", async () => {
+      const patientARegisterRes = await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({
+          fullName: 'Patient Transaction Owner A',
+          email: 'patient-transaction-owner-a@mail.com',
+          password: 'password123',
+          role: UserRole.PATIENT,
+        })
+        .expect(201);
+      const patientAToken = (patientARegisterRes.body as AuthResponse).data.accessToken;
+
+      const patientBRegisterRes = await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({
+          fullName: 'Patient Transaction Owner B',
+          email: 'patient-transaction-owner-b@mail.com',
+          password: 'password123',
+          role: UserRole.PATIENT,
+        })
+        .expect(201);
+      const patientBToken = (patientBRegisterRes.body as AuthResponse).data.accessToken;
+
+      const therapistRegisterRes = await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({
+          fullName: 'Therapist Transaction Owner',
+          email: 'therapist-transaction-owner@mail.com',
+          password: 'password123',
+          role: UserRole.PHYSIOTHERAPIST,
+        })
+        .expect(201);
+      const therapistUserId = (therapistRegisterRes.body as AuthResponse).data.user.id;
+      const therapistProfile = await prisma.physiotherapistProfile.findUnique({
+        where: { userId: therapistUserId },
+      });
+      expect(therapistProfile).toBeTruthy();
+
+      await prisma.physiotherapistProfile.update({
+        where: { id: therapistProfile!.id },
+        data: {
+          verificationStatus: 'APPROVED',
+          verifiedAt: new Date(),
+        },
+      });
+
+      const bookingRes = await request(app.getHttpServer())
+        .post('/bookings')
+        .set('Authorization', `Bearer ${patientBToken}`)
+        .send({
+          physiotherapistId: therapistProfile!.id,
+          appointmentType: 'CLINIC_VISIT',
+          appointmentDate: '2099-11-01T09:00:00.000Z',
+          clinicAddress: 'Jl. Ownership Transaction 123',
+        })
+        .expect(201);
+      const bookingId = (bookingRes.body as ApiEnvelope<{ id: string }>).data.id;
+
+      const transactionRes = await request(app.getHttpServer())
+        .post('/transactions')
+        .set('Authorization', `Bearer ${patientBToken}`)
+        .send({
+          bookingId,
+          amount: 150000,
+          paymentMethod: 'BANK_TRANSFER',
+        })
+        .expect(201);
+      const transactionId = (transactionRes.body as ApiEnvelope<{ id: string }>).data.id;
+
+      const res = await request(app.getHttpServer())
+        .patch(`/transactions/${transactionId}/pay`)
+        .set('Authorization', `Bearer ${patientAToken}`)
+        .expect(404);
+
+      expect(res.body.success).toBe(false);
+      expect(res.body.error.code).toBe(404);
+      expect(res.body.error.message).toBe('Transaction not found.');
+    });
   });
 });
