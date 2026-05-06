@@ -207,4 +207,103 @@ describe('Core integration (real DB, no service mocks)', () => {
       }),
     );
   });
+
+  it('booking transaction lifecycle works: create -> pay -> admin refund', async () => {
+    const adminRegisterRes = await request(app.getHttpServer())
+      .post('/auth/register')
+      .send({
+        fullName: 'Bootstrap Admin',
+        email: 'bootstrap-admin@mail.com',
+        password: 'password123',
+        role: UserRole.PATIENT,
+      })
+      .expect(201);
+    const adminUserId = (adminRegisterRes.body as AuthResponse).data.user.id;
+
+    await prisma.user.update({
+      where: { id: adminUserId },
+      data: { role: UserRole.ADMIN },
+    });
+
+    const adminLoginRes = await request(app.getHttpServer())
+      .post('/auth/login')
+      .send({
+        email: 'bootstrap-admin@mail.com',
+        password: 'password123',
+      })
+      .expect(201);
+    const adminToken = (adminLoginRes.body as AuthResponse).data.accessToken;
+
+    const patientRegisterRes = await request(app.getHttpServer())
+      .post('/auth/register')
+      .send({
+        fullName: 'Patient Tx',
+        email: 'patient-tx@mail.com',
+        password: 'password123',
+        role: UserRole.PATIENT,
+      })
+      .expect(201);
+    const patientToken = (patientRegisterRes.body as AuthResponse).data.accessToken;
+
+    const therapistRegisterRes = await request(app.getHttpServer())
+      .post('/auth/register')
+      .send({
+        fullName: 'Therapist Tx',
+        email: 'therapist-tx@mail.com',
+        password: 'password123',
+        role: UserRole.PHYSIOTHERAPIST,
+      })
+      .expect(201);
+    const therapistUserId = (therapistRegisterRes.body as AuthResponse).data.user.id;
+    const therapistProfile = await prisma.physiotherapistProfile.findUnique({
+      where: { userId: therapistUserId },
+    });
+    expect(therapistProfile).toBeTruthy();
+
+    await prisma.physiotherapistProfile.update({
+      where: { id: therapistProfile!.id },
+      data: {
+        verificationStatus: 'APPROVED',
+        verifiedAt: new Date(),
+      },
+    });
+
+    const bookingRes = await request(app.getHttpServer())
+      .post('/bookings')
+      .set('Authorization', `Bearer ${patientToken}`)
+      .send({
+        physiotherapistId: therapistProfile!.id,
+        appointmentType: 'CLINIC_VISIT',
+        appointmentDate: '2099-07-01T09:00:00.000Z',
+        clinicAddress: 'Jl. Integrasi Transaksi 123',
+      })
+      .expect(201);
+    const bookingId = (bookingRes.body as ApiEnvelope<{ id: string }>).data.id;
+
+    const transactionCreateRes = await request(app.getHttpServer())
+      .post('/transactions')
+      .set('Authorization', `Bearer ${patientToken}`)
+      .send({
+        bookingId,
+        amount: 250000,
+        paymentMethod: 'BANK_TRANSFER',
+      })
+      .expect(201);
+    const transactionId = (transactionCreateRes.body as ApiEnvelope<{ id: string }>).data.id;
+
+    const payRes = await request(app.getHttpServer())
+      .patch(`/transactions/${transactionId}/pay`)
+      .set('Authorization', `Bearer ${patientToken}`)
+      .expect(200);
+    expect((payRes.body as ApiEnvelope<{ status: string }>).data.status).toBe('PAID');
+
+    const refundRes = await request(app.getHttpServer())
+      .patch(`/admin/transactions/${transactionId}/refund`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ reason: 'Integration refund test' })
+      .expect(200);
+    expect((refundRes.body as ApiEnvelope<{ status: string }>).data.status).toBe(
+      'REFUNDED',
+    );
+  });
 });

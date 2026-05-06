@@ -21,6 +21,7 @@ Quick map of automated test coverage currently available in this repository.
   - Real integration flows (no service mocks) using `AppModule` + real database:
     - `register -> login -> /auth/me`
     - patient `create consultation -> create booking` with approved therapist.
+    - booking transaction lifecycle: `create transaction -> pay -> admin refund`.
 
 ### Response shaping
 
