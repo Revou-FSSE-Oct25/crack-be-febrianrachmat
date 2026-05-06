@@ -6,6 +6,7 @@ Quick map of automated test coverage currently available in this repository.
 
 - Run all tests: `npm test`
 - Type-check/build check: `npm run build`
+- Run real integration tests (no service mocks): `npm run test:integration`
 
 ## Current test coverage map
 
@@ -16,6 +17,8 @@ Quick map of automated test coverage currently available in this repository.
 - `src/auth/auth.e2e.spec.ts`
   - E2E-lite smoke coverage for public auth endpoints (`register`, `login`) with validation pipe enabled.
   - Protected route smoke coverage for `GET /auth/me` using a mock auth guard.
+- `src/integration/auth.integration.spec.ts`
+  - Real integration flow (no service mocks) using `AppModule` + real database: `register -> login -> /auth/me`.
 
 ### Response shaping
 
