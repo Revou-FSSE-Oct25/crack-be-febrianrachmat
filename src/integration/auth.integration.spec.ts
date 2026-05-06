@@ -997,5 +997,152 @@ describe('Core integration (real DB, no service mocks)', () => {
       expect(res.body.error.code).toBe(404);
       expect(res.body.error.message).toBe('Availability slot not found.');
     });
+
+    it("returns 403 when non-participant patient reads another user's conversation messages", async () => {
+      const patientARegisterRes = await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({
+          fullName: 'Patient Chat Outsider A',
+          email: 'patient-chat-outsider-a@mail.com',
+          password: 'password123',
+          role: UserRole.PATIENT,
+        })
+        .expect(201);
+      const patientAToken = (patientARegisterRes.body as AuthResponse).data.accessToken;
+
+      const patientBRegisterRes = await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({
+          fullName: 'Patient Chat Owner B',
+          email: 'patient-chat-owner-b@mail.com',
+          password: 'password123',
+          role: UserRole.PATIENT,
+        })
+        .expect(201);
+      const patientBToken = (patientBRegisterRes.body as AuthResponse).data.accessToken;
+
+      const therapistRegisterRes = await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({
+          fullName: 'Therapist Chat Owner',
+          email: 'therapist-chat-owner@mail.com',
+          password: 'password123',
+          role: UserRole.PHYSIOTHERAPIST,
+        })
+        .expect(201);
+      const therapistUserId = (therapistRegisterRes.body as AuthResponse).data.user.id;
+      const therapistProfile = await prisma.physiotherapistProfile.findUnique({
+        where: { userId: therapistUserId },
+      });
+      expect(therapistProfile).toBeTruthy();
+
+      await prisma.physiotherapistProfile.update({
+        where: { id: therapistProfile!.id },
+        data: {
+          verificationStatus: 'APPROVED',
+          verifiedAt: new Date(),
+        },
+      });
+
+      const consultationRes = await request(app.getHttpServer())
+        .post('/consultations')
+        .set('Authorization', `Bearer ${patientBToken}`)
+        .send({
+          physiotherapistId: therapistProfile!.id,
+          complaint: 'Chat ownership access test.',
+        })
+        .expect(201);
+      const consultationId = (consultationRes.body as ApiEnvelope<{ id: string }>).data.id;
+
+      const conversationRes = await request(app.getHttpServer())
+        .post('/chat/conversations')
+        .set('Authorization', `Bearer ${patientBToken}`)
+        .send({ consultationId })
+        .expect(201);
+      const conversationId = (conversationRes.body as ApiEnvelope<{ id: string }>).data.id;
+
+      const res = await request(app.getHttpServer())
+        .get(`/chat/conversations/${conversationId}/messages`)
+        .set('Authorization', `Bearer ${patientAToken}`)
+        .expect(403);
+
+      expect(res.body.success).toBe(false);
+      expect(res.body.error.code).toBe(403);
+      expect(res.body.error.message).toBe('You are not part of this conversation.');
+    });
+
+    it("returns 403 when non-participant patient sends message to another user's conversation", async () => {
+      const patientARegisterRes = await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({
+          fullName: 'Patient Chat Sender A',
+          email: 'patient-chat-sender-a@mail.com',
+          password: 'password123',
+          role: UserRole.PATIENT,
+        })
+        .expect(201);
+      const patientAToken = (patientARegisterRes.body as AuthResponse).data.accessToken;
+
+      const patientBRegisterRes = await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({
+          fullName: 'Patient Chat Receiver B',
+          email: 'patient-chat-receiver-b@mail.com',
+          password: 'password123',
+          role: UserRole.PATIENT,
+        })
+        .expect(201);
+      const patientBToken = (patientBRegisterRes.body as AuthResponse).data.accessToken;
+
+      const therapistRegisterRes = await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({
+          fullName: 'Therapist Chat Receiver',
+          email: 'therapist-chat-receiver@mail.com',
+          password: 'password123',
+          role: UserRole.PHYSIOTHERAPIST,
+        })
+        .expect(201);
+      const therapistUserId = (therapistRegisterRes.body as AuthResponse).data.user.id;
+      const therapistProfile = await prisma.physiotherapistProfile.findUnique({
+        where: { userId: therapistUserId },
+      });
+      expect(therapistProfile).toBeTruthy();
+
+      await prisma.physiotherapistProfile.update({
+        where: { id: therapistProfile!.id },
+        data: {
+          verificationStatus: 'APPROVED',
+          verifiedAt: new Date(),
+        },
+      });
+
+      const consultationRes = await request(app.getHttpServer())
+        .post('/consultations')
+        .set('Authorization', `Bearer ${patientBToken}`)
+        .send({
+          physiotherapistId: therapistProfile!.id,
+          complaint: 'Chat ownership send test.',
+        })
+        .expect(201);
+      const consultationId = (consultationRes.body as ApiEnvelope<{ id: string }>).data.id;
+
+      const conversationRes = await request(app.getHttpServer())
+        .post('/chat/conversations')
+        .set('Authorization', `Bearer ${patientBToken}`)
+        .send({ consultationId })
+        .expect(201);
+      const conversationId = (conversationRes.body as ApiEnvelope<{ id: string }>).data.id;
+
+      const res = await request(app.getHttpServer())
+        .post(`/chat/conversations/${conversationId}/messages`)
+        .set('Authorization', `Bearer ${patientAToken}`)
+        .send({ content: 'I should not be able to post here.' })
+        .expect(403);
+
+      expect(res.body.success).toBe(false);
+      expect(res.body.error.code).toBe(403);
+      expect(res.body.error.message).toBe('You are not part of this conversation.');
+    });
   });
 });

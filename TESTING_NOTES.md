@@ -33,6 +33,7 @@ Quick map of automated test coverage currently available in this repository.
       - therapist A cannot update therapist B consultation (`403 You can only update your own consultations`).
       - therapist A cannot update therapist B booking (`403 You can only update your own bookings`).
       - therapist A cannot update/delete therapist B availability slot (`404 Availability slot not found`).
+      - patient outsider cannot read/send messages in another user's chat conversation (`403 You are not part of this conversation`).
 
 ### Response shaping
 
@@ -87,5 +88,5 @@ Quick map of automated test coverage currently available in this repository.
 
 - Deeper integration/e2e flow tests across modules:
   - auth -> create slot -> create booking -> transaction -> notification.
-- Negative-path tests for more role/ownership edge cases (remaining candidate: ownership checks on chat/conversation participant access).
+- Negative-path tests for more role/ownership edge cases (remaining candidate: non-participant cannot create/get conversation by consultationId).
 - Optional: coverage threshold in Jest config to enforce minimum baseline.
