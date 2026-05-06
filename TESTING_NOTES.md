@@ -22,6 +22,7 @@ Quick map of automated test coverage currently available in this repository.
     - `register -> login -> /auth/me`
     - patient `create consultation -> create booking` with approved therapist.
     - booking transaction lifecycle: `create transaction -> pay -> admin refund`.
+    - cross-module happy path: `slot -> consultation -> booking(slot) -> chat -> payment -> notifications`.
     - RBAC negative paths (`describe('RBAC negative paths')`):
       - patient: admin refund, admin dashboard, broadcast notification, create availability slot.
       - physiotherapist: create consultation, mark transaction paid.
@@ -89,6 +90,6 @@ Quick map of automated test coverage currently available in this repository.
 ## Known test gaps (next candidates)
 
 - Deeper integration/e2e flow tests across modules:
-  - auth -> create slot -> create booking -> transaction -> notification.
+  - auth -> consultation status transitions -> booking status transitions -> transaction refund -> notifications read-all.
 - Negative-path tests for more role/ownership edge cases (remaining candidate: admin moderation edge behavior in chat participants/messages, if business rule needed).
 - Optional: coverage threshold in Jest config to enforce minimum baseline.

@@ -307,6 +307,147 @@ describe('Core integration (real DB, no service mocks)', () => {
     );
   });
 
+  it('cross-module flow works: slot booking -> chat -> payment -> notifications', async () => {
+    const patientRegisterRes = await request(app.getHttpServer())
+      .post('/auth/register')
+      .send({
+        fullName: 'Patient Full Flow',
+        email: 'patient-full-flow@mail.com',
+        password: 'password123',
+        role: UserRole.PATIENT,
+      })
+      .expect(201);
+    const patientToken = (patientRegisterRes.body as AuthResponse).data.accessToken;
+
+    const therapistRegisterRes = await request(app.getHttpServer())
+      .post('/auth/register')
+      .send({
+        fullName: 'Therapist Full Flow',
+        email: 'therapist-full-flow@mail.com',
+        password: 'password123',
+        role: UserRole.PHYSIOTHERAPIST,
+      })
+      .expect(201);
+    const therapistToken = (therapistRegisterRes.body as AuthResponse).data.accessToken;
+    const therapistUserId = (therapistRegisterRes.body as AuthResponse).data.user.id;
+    const therapistProfile = await prisma.physiotherapistProfile.findUnique({
+      where: { userId: therapistUserId },
+    });
+    expect(therapistProfile).toBeTruthy();
+
+    await prisma.physiotherapistProfile.update({
+      where: { id: therapistProfile!.id },
+      data: {
+        verificationStatus: 'APPROVED',
+        verifiedAt: new Date(),
+      },
+    });
+
+    const slotRes = await request(app.getHttpServer())
+      .post('/physiotherapists/me/availability-slots')
+      .set('Authorization', `Bearer ${therapistToken}`)
+      .send({
+        slotDate: '2099-12-30',
+        startTime: '2099-12-30T09:00:00.000Z',
+        endTime: '2099-12-30T10:00:00.000Z',
+      })
+      .expect(201);
+    const slotId = (slotRes.body as ApiEnvelope<{ id: string }>).data.id;
+
+    const consultationRes = await request(app.getHttpServer())
+      .post('/consultations')
+      .set('Authorization', `Bearer ${patientToken}`)
+      .send({
+        physiotherapistId: therapistProfile!.id,
+        complaint: 'Cross module integration flow test.',
+      })
+      .expect(201);
+    const consultationId = (consultationRes.body as ApiEnvelope<{ id: string }>).data.id;
+
+    const bookingRes = await request(app.getHttpServer())
+      .post('/bookings')
+      .set('Authorization', `Bearer ${patientToken}`)
+      .send({
+        consultationId,
+        physiotherapistId: therapistProfile!.id,
+        slotId,
+        appointmentType: 'CLINIC_VISIT',
+        clinicAddress: 'Jl. Integrasi Full Flow 123',
+      })
+      .expect(201);
+    const booking = (bookingRes.body as ApiEnvelope<{
+      id: string;
+      slotId: string | null;
+      appointmentDate: string;
+    }>).data;
+    expect(booking.slotId).toBe(slotId);
+    expect(booking.appointmentDate).toBe('2099-12-30T09:00:00.000Z');
+
+    const conversationRes = await request(app.getHttpServer())
+      .post('/chat/conversations')
+      .set('Authorization', `Bearer ${patientToken}`)
+      .send({ consultationId })
+      .expect(201);
+    const conversationId = (conversationRes.body as ApiEnvelope<{ id: string }>).data.id;
+
+    await request(app.getHttpServer())
+      .post(`/chat/conversations/${conversationId}/messages`)
+      .set('Authorization', `Bearer ${patientToken}`)
+      .send({ content: 'Hello therapist, please confirm my schedule.' })
+      .expect(201);
+
+    const therapistMessagesRes = await request(app.getHttpServer())
+      .get(`/chat/conversations/${conversationId}/messages`)
+      .set('Authorization', `Bearer ${therapistToken}`)
+      .expect(200);
+    const therapistMessages = (therapistMessagesRes.body as ApiEnvelope<
+      Array<{ content: string }>
+    >).data;
+    expect(therapistMessages.length).toBeGreaterThan(0);
+    expect(therapistMessages[0].content).toContain('Hello therapist');
+
+    const transactionRes = await request(app.getHttpServer())
+      .post('/transactions')
+      .set('Authorization', `Bearer ${patientToken}`)
+      .send({
+        bookingId: booking.id,
+        amount: 300000,
+        paymentMethod: 'BANK_TRANSFER',
+      })
+      .expect(201);
+    const transactionId = (transactionRes.body as ApiEnvelope<{ id: string }>).data.id;
+
+    await request(app.getHttpServer())
+      .patch(`/transactions/${transactionId}/pay`)
+      .set('Authorization', `Bearer ${patientToken}`)
+      .expect(200);
+
+    const patientNotificationsRes = await request(app.getHttpServer())
+      .get('/notifications/me')
+      .set('Authorization', `Bearer ${patientToken}`)
+      .expect(200);
+    const patientNotifications = (patientNotificationsRes.body as ApiEnvelope<
+      Array<{ title: string }>
+    >).data;
+    expect(
+      patientNotifications.some((item) => item.title === 'Payment Successful'),
+    ).toBe(true);
+
+    const therapistNotificationsRes = await request(app.getHttpServer())
+      .get('/notifications/me')
+      .set('Authorization', `Bearer ${therapistToken}`)
+      .expect(200);
+    const therapistNotifications = (therapistNotificationsRes.body as ApiEnvelope<
+      Array<{ title: string }>
+    >).data;
+    expect(
+      therapistNotifications.some((item) => item.title === 'New Consultation Request'),
+    ).toBe(true);
+    expect(
+      therapistNotifications.some((item) => item.title === 'New Booking Request'),
+    ).toBe(true);
+  });
+
   it('returns 403 when patient calls admin refund endpoint', async () => {
     const patientRegisterRes = await request(app.getHttpServer())
       .post('/auth/register')
