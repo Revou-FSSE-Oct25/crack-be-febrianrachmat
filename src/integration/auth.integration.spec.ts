@@ -1144,5 +1144,72 @@ describe('Core integration (real DB, no service mocks)', () => {
       expect(res.body.error.code).toBe(403);
       expect(res.body.error.message).toBe('You are not part of this conversation.');
     });
+
+    it("returns 403 when non-participant patient creates/gets conversation using another user's consultation", async () => {
+      const patientARegisterRes = await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({
+          fullName: 'Patient Chat Consultation Outsider',
+          email: 'patient-chat-consultation-outsider@mail.com',
+          password: 'password123',
+          role: UserRole.PATIENT,
+        })
+        .expect(201);
+      const patientAToken = (patientARegisterRes.body as AuthResponse).data.accessToken;
+
+      const patientBRegisterRes = await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({
+          fullName: 'Patient Chat Consultation Owner',
+          email: 'patient-chat-consultation-owner@mail.com',
+          password: 'password123',
+          role: UserRole.PATIENT,
+        })
+        .expect(201);
+      const patientBToken = (patientBRegisterRes.body as AuthResponse).data.accessToken;
+
+      const therapistRegisterRes = await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({
+          fullName: 'Therapist Chat Consultation Owner',
+          email: 'therapist-chat-consultation-owner@mail.com',
+          password: 'password123',
+          role: UserRole.PHYSIOTHERAPIST,
+        })
+        .expect(201);
+      const therapistUserId = (therapistRegisterRes.body as AuthResponse).data.user.id;
+      const therapistProfile = await prisma.physiotherapistProfile.findUnique({
+        where: { userId: therapistUserId },
+      });
+      expect(therapistProfile).toBeTruthy();
+
+      await prisma.physiotherapistProfile.update({
+        where: { id: therapistProfile!.id },
+        data: {
+          verificationStatus: 'APPROVED',
+          verifiedAt: new Date(),
+        },
+      });
+
+      const consultationRes = await request(app.getHttpServer())
+        .post('/consultations')
+        .set('Authorization', `Bearer ${patientBToken}`)
+        .send({
+          physiotherapistId: therapistProfile!.id,
+          complaint: 'Outsider should not create/get conversation from this consultation.',
+        })
+        .expect(201);
+      const consultationId = (consultationRes.body as ApiEnvelope<{ id: string }>).data.id;
+
+      const res = await request(app.getHttpServer())
+        .post('/chat/conversations')
+        .set('Authorization', `Bearer ${patientAToken}`)
+        .send({ consultationId })
+        .expect(403);
+
+      expect(res.body.success).toBe(false);
+      expect(res.body.error.code).toBe(403);
+      expect(res.body.error.message).toBe('You are not part of this consultation.');
+    });
   });
 });
