@@ -448,6 +448,114 @@ describe('Core integration (real DB, no service mocks)', () => {
     ).toBe(true);
   });
 
+  it('status transition chain works and blocks cancellation after completion', async () => {
+    const patientRegisterRes = await request(app.getHttpServer())
+      .post('/auth/register')
+      .send({
+        fullName: 'Patient Status Chain',
+        email: 'patient-status-chain@mail.com',
+        password: 'password123',
+        role: UserRole.PATIENT,
+      })
+      .expect(201);
+    const patientToken = (patientRegisterRes.body as AuthResponse).data.accessToken;
+
+    const therapistRegisterRes = await request(app.getHttpServer())
+      .post('/auth/register')
+      .send({
+        fullName: 'Therapist Status Chain',
+        email: 'therapist-status-chain@mail.com',
+        password: 'password123',
+        role: UserRole.PHYSIOTHERAPIST,
+      })
+      .expect(201);
+    const therapistToken = (therapistRegisterRes.body as AuthResponse).data.accessToken;
+    const therapistUserId = (therapistRegisterRes.body as AuthResponse).data.user.id;
+    const therapistProfile = await prisma.physiotherapistProfile.findUnique({
+      where: { userId: therapistUserId },
+    });
+    expect(therapistProfile).toBeTruthy();
+
+    await prisma.physiotherapistProfile.update({
+      where: { id: therapistProfile!.id },
+      data: {
+        verificationStatus: 'APPROVED',
+        verifiedAt: new Date(),
+      },
+    });
+
+    const consultationRes = await request(app.getHttpServer())
+      .post('/consultations')
+      .set('Authorization', `Bearer ${patientToken}`)
+      .send({
+        physiotherapistId: therapistProfile!.id,
+        complaint: 'Lifecycle transition end-to-end test.',
+      })
+      .expect(201);
+    const consultationId = (consultationRes.body as ApiEnvelope<{ id: string }>).data.id;
+
+    const acceptedConsultationRes = await request(app.getHttpServer())
+      .patch(`/consultations/${consultationId}/status`)
+      .set('Authorization', `Bearer ${therapistToken}`)
+      .send({ status: 'ACCEPTED' })
+      .expect(200);
+    expect(
+      (acceptedConsultationRes.body as ApiEnvelope<{ status: string }>).data.status,
+    ).toBe('ACCEPTED');
+
+    const bookingRes = await request(app.getHttpServer())
+      .post('/bookings')
+      .set('Authorization', `Bearer ${patientToken}`)
+      .send({
+        consultationId,
+        physiotherapistId: therapistProfile!.id,
+        appointmentType: 'CLINIC_VISIT',
+        appointmentDate: '2099-12-25T09:00:00.000Z',
+        clinicAddress: 'Jl. Status Transition 123',
+      })
+      .expect(201);
+    const bookingId = (bookingRes.body as ApiEnvelope<{ id: string }>).data.id;
+
+    const confirmedRes = await request(app.getHttpServer())
+      .patch(`/bookings/${bookingId}/status`)
+      .set('Authorization', `Bearer ${therapistToken}`)
+      .send({ status: 'CONFIRMED' })
+      .expect(200);
+    expect((confirmedRes.body as ApiEnvelope<{ status: string }>).data.status).toBe(
+      'CONFIRMED',
+    );
+
+    const inProgressRes = await request(app.getHttpServer())
+      .patch(`/bookings/${bookingId}/status`)
+      .set('Authorization', `Bearer ${therapistToken}`)
+      .send({ status: 'IN_PROGRESS' })
+      .expect(200);
+    expect((inProgressRes.body as ApiEnvelope<{ status: string }>).data.status).toBe(
+      'IN_PROGRESS',
+    );
+
+    const completedRes = await request(app.getHttpServer())
+      .patch(`/bookings/${bookingId}/status`)
+      .set('Authorization', `Bearer ${therapistToken}`)
+      .send({ status: 'COMPLETED' })
+      .expect(200);
+    expect((completedRes.body as ApiEnvelope<{ status: string }>).data.status).toBe(
+      'COMPLETED',
+    );
+
+    const cancelAfterCompletedRes = await request(app.getHttpServer())
+      .patch(`/bookings/${bookingId}/status`)
+      .set('Authorization', `Bearer ${patientToken}`)
+      .send({ status: 'CANCELLED' })
+      .expect(400);
+
+    expect(cancelAfterCompletedRes.body.success).toBe(false);
+    expect(cancelAfterCompletedRes.body.error.code).toBe(400);
+    expect(cancelAfterCompletedRes.body.error.message).toContain(
+      'Invalid booking status transition',
+    );
+  });
+
   it('returns 403 when patient calls admin refund endpoint', async () => {
     const patientRegisterRes = await request(app.getHttpServer())
       .post('/auth/register')
