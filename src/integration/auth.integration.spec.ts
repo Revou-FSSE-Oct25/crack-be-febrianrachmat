@@ -612,5 +612,74 @@ describe('Core integration (real DB, no service mocks)', () => {
       expect(res.body.error.code).toBe(403);
       expect(res.body.error.message).toBe('You can only update your own bookings.');
     });
+
+    it("returns 403 when patient A cancels patient B's consultation", async () => {
+      const patientARegisterRes = await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({
+          fullName: 'Patient Consultation Owner A',
+          email: 'patient-consultation-owner-a@mail.com',
+          password: 'password123',
+          role: UserRole.PATIENT,
+        })
+        .expect(201);
+      const patientAToken = (patientARegisterRes.body as AuthResponse).data.accessToken;
+
+      const patientBRegisterRes = await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({
+          fullName: 'Patient Consultation Owner B',
+          email: 'patient-consultation-owner-b@mail.com',
+          password: 'password123',
+          role: UserRole.PATIENT,
+        })
+        .expect(201);
+      const patientBToken = (patientBRegisterRes.body as AuthResponse).data.accessToken;
+
+      const therapistRegisterRes = await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({
+          fullName: 'Therapist Consultation Owner',
+          email: 'therapist-consultation-owner@mail.com',
+          password: 'password123',
+          role: UserRole.PHYSIOTHERAPIST,
+        })
+        .expect(201);
+      const therapistUserId = (therapistRegisterRes.body as AuthResponse).data.user.id;
+      const therapistProfile = await prisma.physiotherapistProfile.findUnique({
+        where: { userId: therapistUserId },
+      });
+      expect(therapistProfile).toBeTruthy();
+
+      await prisma.physiotherapistProfile.update({
+        where: { id: therapistProfile!.id },
+        data: {
+          verificationStatus: 'APPROVED',
+          verifiedAt: new Date(),
+        },
+      });
+
+      const consultationRes = await request(app.getHttpServer())
+        .post('/consultations')
+        .set('Authorization', `Bearer ${patientBToken}`)
+        .send({
+          physiotherapistId: therapistProfile!.id,
+          complaint: 'Knee pain for ownership check.',
+        })
+        .expect(201);
+      const consultationId = (consultationRes.body as ApiEnvelope<{ id: string }>).data.id;
+
+      const res = await request(app.getHttpServer())
+        .patch(`/consultations/${consultationId}/status`)
+        .set('Authorization', `Bearer ${patientAToken}`)
+        .send({ status: 'CANCELLED' })
+        .expect(403);
+
+      expect(res.body.success).toBe(false);
+      expect(res.body.error.code).toBe(403);
+      expect(res.body.error.message).toBe(
+        'You can only update your own consultations.',
+      );
+    });
   });
 });
