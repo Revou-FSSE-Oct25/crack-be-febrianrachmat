@@ -37,7 +37,6 @@ Quick map of automated test coverage currently available in this repository.
       - therapist A cannot update/delete therapist B availability slot (`404 Availability slot not found`).
       - patient outsider cannot read/send messages in another user's chat conversation (`403 You are not part of this conversation`).
       - patient outsider cannot create/get conversation from another user's consultation (`403 You are not part of this consultation`).
-      - patient outsider cannot create/get conversation from another user's consultation (`403 You are not part of this consultation`).
 
 ### Response shaping
 

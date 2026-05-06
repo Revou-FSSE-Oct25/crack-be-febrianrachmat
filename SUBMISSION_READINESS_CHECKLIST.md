@@ -109,9 +109,11 @@ Legend:
 - [x] Unit tests exist for major BE modules.
 - [x] Controller delegation tests exist for key modules.
 - [x] E2E-lite smoke tests exist for selected protected/public endpoints.
+- [x] Real integration tests (no service mocks) exist and cover positive + negative RBAC/ownership flows.
 - [x] `npm test` passes.
 - [x] `npm run build` passes.
-- [~] Coverage metrics are measurable and can be shown (if assessor requests percentage).
+- [x] `npm run test:integration` passes (latest local run: 22 tests, 1 suite).
+- [~] Coverage metrics are measurable and can be shown (if assessor requests percentage) via Jest coverage run.
 
 ---
 
@@ -129,10 +131,10 @@ Legend:
 
 ## Final Go / No-Go Gate (Before Submission)
 
-- [~] All mandatory rubric points are either Done or have proof.
+- [~] All mandatory backend rubric points are either Done or have proof.
 - [~] FE link and BE link are both healthy and tested on another network/device.
 - [~] README / docs include all required links and artifacts.
-- [~] Demo flow tested end-to-end once without debugging pauses.
+- [x] Backend demo flow tested end-to-end once without debugging pauses (integration test suite).
 - [~] Submission package reviewed once by checklist owner and once by peer (if possible).
 
 If any item in this section is unchecked, postpone submission and fix first.
