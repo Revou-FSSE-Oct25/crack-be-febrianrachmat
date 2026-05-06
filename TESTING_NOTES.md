@@ -22,7 +22,7 @@ Quick map of automated test coverage currently available in this repository.
     - `register -> login -> /auth/me`
     - patient `create consultation -> create booking` with approved therapist.
     - booking transaction lifecycle: `create transaction -> pay -> admin refund`.
-    - cross-module happy path: `slot -> consultation -> booking(slot) -> chat -> payment -> notifications`.
+    - cross-module happy path: `slot -> consultation -> booking(slot) -> chat -> payment -> notifications -> notifications/read-all`.
     - status transition chain: consultation `ACCEPTED`, booking `CONFIRMED -> IN_PROGRESS -> COMPLETED`, and completed booking cannot be cancelled (`400`).
     - RBAC negative paths (`describe('RBAC negative paths')`):
       - patient: admin refund, admin dashboard, broadcast notification, create availability slot.

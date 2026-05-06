@@ -446,6 +446,26 @@ describe('Core integration (real DB, no service mocks)', () => {
     expect(
       therapistNotifications.some((item) => item.title === 'New Booking Request'),
     ).toBe(true);
+
+    const markAllReadRes = await request(app.getHttpServer())
+      .patch('/notifications/read-all')
+      .set('Authorization', `Bearer ${patientToken}`)
+      .expect(200);
+    const markAllReadData = (markAllReadRes.body as ApiEnvelope<{
+      message: string;
+      updatedCount: number;
+    }>).data;
+    expect(markAllReadData.message).toBe('All notifications marked as read.');
+    expect(markAllReadData.updatedCount).toBeGreaterThan(0);
+
+    const patientNotificationsAfterReadRes = await request(app.getHttpServer())
+      .get('/notifications/me')
+      .set('Authorization', `Bearer ${patientToken}`)
+      .expect(200);
+    const patientNotificationsAfterRead = (
+      patientNotificationsAfterReadRes.body as ApiEnvelope<Array<{ isRead: boolean }>>
+    ).data;
+    expect(patientNotificationsAfterRead.every((item) => item.isRead)).toBe(true);
   });
 
   it('status transition chain works and blocks cancellation after completion', async () => {
