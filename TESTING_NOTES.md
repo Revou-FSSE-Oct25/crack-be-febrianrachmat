@@ -7,6 +7,15 @@ Quick map of automated test coverage currently available in this repository.
 - Run all tests: `npm test`
 - Type-check/build check: `npm run build`
 - Run real integration tests (no service mocks): `npm run test:integration`
+- Run unit + integration sequentially (recommended): `npm run test:all`
+- Run unit test coverage report: `npm run test:cov`
+
+## Latest local results (example)
+
+- `npm run test:all`:
+  - unit/e2e-lite: 15 suites, 100 tests ✅
+  - integration: 1 suite, 22 tests ✅
+- `npm run test:cov` (unit/e2e-lite only): ~77.7% statements, ~55.2% branches, ~70.2% functions, ~76.7% lines
 
 ## Current test coverage map
 
