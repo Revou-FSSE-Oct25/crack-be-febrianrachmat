@@ -30,6 +30,8 @@ Quick map of automated test coverage currently available in this repository.
       - patient A cannot update patient B booking status (`403 You can only update your own bookings`).
       - patient A cannot cancel patient B consultation (`403 You can only update your own consultations`).
       - patient A cannot pay patient B transaction (`404 Transaction not found`).
+      - therapist A cannot update therapist B consultation (`403 You can only update your own consultations`).
+      - therapist A cannot update therapist B booking (`403 You can only update your own bookings`).
 
 ### Response shaping
 
@@ -84,5 +86,5 @@ Quick map of automated test coverage currently available in this repository.
 
 - Deeper integration/e2e flow tests across modules:
   - auth -> create slot -> create booking -> transaction -> notification.
-- Negative-path tests for more role/ownership edge cases (remaining candidate: physiotherapist ownership mismatch on consultation/booking updates).
+- Negative-path tests for more role/ownership edge cases (remaining candidate: slot ownership mismatch for physiotherapist update/delete).
 - Optional: coverage threshold in Jest config to enforce minimum baseline.

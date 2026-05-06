@@ -760,5 +760,153 @@ describe('Core integration (real DB, no service mocks)', () => {
       expect(res.body.error.code).toBe(404);
       expect(res.body.error.message).toBe('Transaction not found.');
     });
+
+    it("returns 403 when therapist A updates therapist B's consultation", async () => {
+      const patientRegisterRes = await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({
+          fullName: 'Patient Therapist Ownership',
+          email: 'patient-therapist-ownership@mail.com',
+          password: 'password123',
+          role: UserRole.PATIENT,
+        })
+        .expect(201);
+      const patientToken = (patientRegisterRes.body as AuthResponse).data.accessToken;
+
+      const therapistARegisterRes = await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({
+          fullName: 'Therapist Owner A',
+          email: 'therapist-owner-a@mail.com',
+          password: 'password123',
+          role: UserRole.PHYSIOTHERAPIST,
+        })
+        .expect(201);
+      const therapistAToken = (therapistARegisterRes.body as AuthResponse).data.accessToken;
+      const therapistAUserId = (therapistARegisterRes.body as AuthResponse).data.user.id;
+
+      const therapistBRegisterRes = await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({
+          fullName: 'Therapist Owner B',
+          email: 'therapist-owner-b@mail.com',
+          password: 'password123',
+          role: UserRole.PHYSIOTHERAPIST,
+        })
+        .expect(201);
+      const therapistBUserId = (therapistBRegisterRes.body as AuthResponse).data.user.id;
+
+      const therapistAProfile = await prisma.physiotherapistProfile.findUnique({
+        where: { userId: therapistAUserId },
+      });
+      const therapistBProfile = await prisma.physiotherapistProfile.findUnique({
+        where: { userId: therapistBUserId },
+      });
+      expect(therapistAProfile).toBeTruthy();
+      expect(therapistBProfile).toBeTruthy();
+
+      await prisma.physiotherapistProfile.updateMany({
+        where: { id: { in: [therapistAProfile!.id, therapistBProfile!.id] } },
+        data: {
+          verificationStatus: 'APPROVED',
+          verifiedAt: new Date(),
+        },
+      });
+
+      const consultationRes = await request(app.getHttpServer())
+        .post('/consultations')
+        .set('Authorization', `Bearer ${patientToken}`)
+        .send({
+          physiotherapistId: therapistBProfile!.id,
+          complaint: 'Should only be editable by therapist B.',
+        })
+        .expect(201);
+      const consultationId = (consultationRes.body as ApiEnvelope<{ id: string }>).data.id;
+
+      const res = await request(app.getHttpServer())
+        .patch(`/consultations/${consultationId}/status`)
+        .set('Authorization', `Bearer ${therapistAToken}`)
+        .send({ status: 'ACCEPTED' })
+        .expect(403);
+
+      expect(res.body.success).toBe(false);
+      expect(res.body.error.code).toBe(403);
+      expect(res.body.error.message).toBe('You can only update your own consultations.');
+    });
+
+    it("returns 403 when therapist A updates therapist B's booking", async () => {
+      const patientRegisterRes = await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({
+          fullName: 'Patient Booking Therapist Ownership',
+          email: 'patient-booking-therapist-ownership@mail.com',
+          password: 'password123',
+          role: UserRole.PATIENT,
+        })
+        .expect(201);
+      const patientToken = (patientRegisterRes.body as AuthResponse).data.accessToken;
+
+      const therapistARegisterRes = await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({
+          fullName: 'Therapist Booking Owner A',
+          email: 'therapist-booking-owner-a@mail.com',
+          password: 'password123',
+          role: UserRole.PHYSIOTHERAPIST,
+        })
+        .expect(201);
+      const therapistAToken = (therapistARegisterRes.body as AuthResponse).data.accessToken;
+      const therapistAUserId = (therapistARegisterRes.body as AuthResponse).data.user.id;
+
+      const therapistBRegisterRes = await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({
+          fullName: 'Therapist Booking Owner B',
+          email: 'therapist-booking-owner-b@mail.com',
+          password: 'password123',
+          role: UserRole.PHYSIOTHERAPIST,
+        })
+        .expect(201);
+      const therapistBUserId = (therapistBRegisterRes.body as AuthResponse).data.user.id;
+
+      const therapistAProfile = await prisma.physiotherapistProfile.findUnique({
+        where: { userId: therapistAUserId },
+      });
+      const therapistBProfile = await prisma.physiotherapistProfile.findUnique({
+        where: { userId: therapistBUserId },
+      });
+      expect(therapistAProfile).toBeTruthy();
+      expect(therapistBProfile).toBeTruthy();
+
+      await prisma.physiotherapistProfile.updateMany({
+        where: { id: { in: [therapistAProfile!.id, therapistBProfile!.id] } },
+        data: {
+          verificationStatus: 'APPROVED',
+          verifiedAt: new Date(),
+        },
+      });
+
+      const bookingRes = await request(app.getHttpServer())
+        .post('/bookings')
+        .set('Authorization', `Bearer ${patientToken}`)
+        .send({
+          physiotherapistId: therapistBProfile!.id,
+          appointmentType: 'CLINIC_VISIT',
+          appointmentDate: '2099-12-01T09:00:00.000Z',
+          clinicAddress: 'Jl. Therapist Ownership Booking',
+        })
+        .expect(201);
+      const bookingId = (bookingRes.body as ApiEnvelope<{ id: string }>).data.id;
+
+      const res = await request(app.getHttpServer())
+        .patch(`/bookings/${bookingId}/status`)
+        .set('Authorization', `Bearer ${therapistAToken}`)
+        .send({ status: 'CONFIRMED' })
+        .expect(403);
+
+      expect(res.body.success).toBe(false);
+      expect(res.body.error.code).toBe(403);
+      expect(res.body.error.message).toBe('You can only update your own bookings.');
+    });
   });
 });
