@@ -18,7 +18,9 @@ Quick map of automated test coverage currently available in this repository.
   - E2E-lite smoke coverage for public auth endpoints (`register`, `login`) with validation pipe enabled.
   - Protected route smoke coverage for `GET /auth/me` using a mock auth guard.
 - `src/integration/auth.integration.spec.ts`
-  - Real integration flow (no service mocks) using `AppModule` + real database: `register -> login -> /auth/me`.
+  - Real integration flows (no service mocks) using `AppModule` + real database:
+    - `register -> login -> /auth/me`
+    - patient `create consultation -> create booking` with approved therapist.
 
 ### Response shaping
 

@@ -24,7 +24,12 @@ type AuthResponse = {
   };
 };
 
-describe('Auth integration (real DB, no service mocks)', () => {
+type ApiEnvelope<T> = {
+  success: boolean;
+  data: T;
+};
+
+describe('Core integration (real DB, no service mocks)', () => {
   let app: INestApplication;
   let prisma: PrismaService;
 
@@ -72,6 +77,10 @@ describe('Auth integration (real DB, no service mocks)', () => {
     await resetDatabase();
   });
 
+  beforeEach(async () => {
+    await resetDatabase();
+  });
+
   afterAll(async () => {
     await resetDatabase();
     await app.close();
@@ -116,6 +125,85 @@ describe('Auth integration (real DB, no service mocks)', () => {
       expect.objectContaining({
         email: 'integration-patient@mail.com',
         role: UserRole.PATIENT,
+      }),
+    );
+  });
+
+  it('patient can create consultation then booking with approved therapist', async () => {
+    const patientRegisterRes = await request(app.getHttpServer())
+      .post('/auth/register')
+      .send({
+        fullName: 'Patient Integration',
+        email: 'patient-flow@mail.com',
+        password: 'password123',
+        role: UserRole.PATIENT,
+      })
+      .expect(201);
+
+    const patientToken = (patientRegisterRes.body as AuthResponse).data.accessToken;
+
+    const therapistRegisterRes = await request(app.getHttpServer())
+      .post('/auth/register')
+      .send({
+        fullName: 'Therapist Integration',
+        email: 'therapist-flow@mail.com',
+        password: 'password123',
+        role: UserRole.PHYSIOTHERAPIST,
+      })
+      .expect(201);
+
+    const therapistUserId = (therapistRegisterRes.body as AuthResponse).data.user.id;
+    const therapistProfile = await prisma.physiotherapistProfile.findUnique({
+      where: { userId: therapistUserId },
+    });
+    expect(therapistProfile).toBeTruthy();
+
+    await prisma.physiotherapistProfile.update({
+      where: { id: therapistProfile!.id },
+      data: {
+        verificationStatus: 'APPROVED',
+        verifiedAt: new Date(),
+      },
+    });
+
+    const consultationRes = await request(app.getHttpServer())
+      .post('/consultations')
+      .set('Authorization', `Bearer ${patientToken}`)
+      .send({
+        physiotherapistId: therapistProfile!.id,
+        complaint: 'Lower back pain for more than two weeks.',
+      })
+      .expect(201);
+
+    const consultationBody = consultationRes.body as ApiEnvelope<{ id: string }>;
+    expect(consultationBody.success).toBe(true);
+    expect(consultationBody.data.id).toBeTruthy();
+
+    const bookingRes = await request(app.getHttpServer())
+      .post('/bookings')
+      .set('Authorization', `Bearer ${patientToken}`)
+      .send({
+        consultationId: consultationBody.data.id,
+        physiotherapistId: therapistProfile!.id,
+        appointmentType: 'CLINIC_VISIT',
+        appointmentDate: '2099-06-01T09:00:00.000Z',
+        clinicAddress: 'Jl. Integrasi Klinik Utama 123',
+        notes: 'Please focus on pain relief first.',
+      })
+      .expect(201);
+
+    const bookingBody = bookingRes.body as ApiEnvelope<{
+      id: string;
+      consultationId: string | null;
+      physiotherapistId: string;
+      appointmentType: string;
+    }>;
+    expect(bookingBody.success).toBe(true);
+    expect(bookingBody.data).toEqual(
+      expect.objectContaining({
+        consultationId: consultationBody.data.id,
+        physiotherapistId: therapistProfile!.id,
+        appointmentType: 'CLINIC_VISIT',
       }),
     );
   });
