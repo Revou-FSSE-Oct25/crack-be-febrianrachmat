@@ -25,6 +25,8 @@ Quick map of automated test coverage currently available in this repository.
     - RBAC negative paths (`describe('RBAC negative paths')`):
       - patient: admin refund, admin dashboard, broadcast notification, create availability slot.
       - physiotherapist: create consultation, mark transaction paid.
+    - Ownership negative path (`describe('Ownership negative paths')`):
+      - patient A cannot mark patient B notification as read (`404 Notification not found`).
 
 ### Response shaping
 
@@ -79,5 +81,5 @@ Quick map of automated test coverage currently available in this repository.
 
 - Deeper integration/e2e flow tests across modules:
   - auth -> create slot -> create booking -> transaction -> notification.
-- Negative-path tests for more role/ownership edge cases (service-layer ownership, e.g. marking another user’s notification read).
+- Negative-path tests for more role/ownership edge cases (remaining candidate: booking/consultation ownership mismatches across multiple users).
 - Optional: coverage threshold in Jest config to enforce minimum baseline.

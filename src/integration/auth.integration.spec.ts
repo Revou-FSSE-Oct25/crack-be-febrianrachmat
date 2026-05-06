@@ -501,4 +501,47 @@ describe('Core integration (real DB, no service mocks)', () => {
       expect(res.body.error.code).toBe(403);
     });
   });
+
+  describe('Ownership negative paths', () => {
+    it("returns 404 when patient A marks patient B's notification as read", async () => {
+      const patientARegisterRes = await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({
+          fullName: 'Patient Owner A',
+          email: 'patient-owner-a@mail.com',
+          password: 'password123',
+          role: UserRole.PATIENT,
+        })
+        .expect(201);
+      const patientAToken = (patientARegisterRes.body as AuthResponse).data.accessToken;
+
+      const patientBRegisterRes = await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({
+          fullName: 'Patient Owner B',
+          email: 'patient-owner-b@mail.com',
+          password: 'password123',
+          role: UserRole.PATIENT,
+        })
+        .expect(201);
+      const patientBUserId = (patientBRegisterRes.body as AuthResponse).data.user.id;
+
+      const notification = await prisma.notification.create({
+        data: {
+          userId: patientBUserId,
+          title: 'Private Notification',
+          body: 'Only patient B can mark this as read.',
+        },
+      });
+
+      const res = await request(app.getHttpServer())
+        .patch(`/notifications/${notification.id}/read`)
+        .set('Authorization', `Bearer ${patientAToken}`)
+        .expect(404);
+
+      expect(res.body.success).toBe(false);
+      expect(res.body.error.code).toBe(404);
+      expect(res.body.error.message).toBe('Notification not found.');
+    });
+  });
 });
