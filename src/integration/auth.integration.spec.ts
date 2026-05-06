@@ -543,5 +543,74 @@ describe('Core integration (real DB, no service mocks)', () => {
       expect(res.body.error.code).toBe(404);
       expect(res.body.error.message).toBe('Notification not found.');
     });
+
+    it("returns 403 when patient A updates patient B's booking status", async () => {
+      const patientARegisterRes = await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({
+          fullName: 'Patient Booking Owner A',
+          email: 'patient-booking-owner-a@mail.com',
+          password: 'password123',
+          role: UserRole.PATIENT,
+        })
+        .expect(201);
+      const patientAToken = (patientARegisterRes.body as AuthResponse).data.accessToken;
+
+      const patientBRegisterRes = await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({
+          fullName: 'Patient Booking Owner B',
+          email: 'patient-booking-owner-b@mail.com',
+          password: 'password123',
+          role: UserRole.PATIENT,
+        })
+        .expect(201);
+      const patientBToken = (patientBRegisterRes.body as AuthResponse).data.accessToken;
+
+      const therapistRegisterRes = await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({
+          fullName: 'Therapist Booking Owner',
+          email: 'therapist-booking-owner@mail.com',
+          password: 'password123',
+          role: UserRole.PHYSIOTHERAPIST,
+        })
+        .expect(201);
+      const therapistUserId = (therapistRegisterRes.body as AuthResponse).data.user.id;
+      const therapistProfile = await prisma.physiotherapistProfile.findUnique({
+        where: { userId: therapistUserId },
+      });
+      expect(therapistProfile).toBeTruthy();
+
+      await prisma.physiotherapistProfile.update({
+        where: { id: therapistProfile!.id },
+        data: {
+          verificationStatus: 'APPROVED',
+          verifiedAt: new Date(),
+        },
+      });
+
+      const bookingRes = await request(app.getHttpServer())
+        .post('/bookings')
+        .set('Authorization', `Bearer ${patientBToken}`)
+        .send({
+          physiotherapistId: therapistProfile!.id,
+          appointmentType: 'CLINIC_VISIT',
+          appointmentDate: '2099-10-01T09:00:00.000Z',
+          clinicAddress: 'Jl. Ownership Booking 123',
+        })
+        .expect(201);
+      const bookingId = (bookingRes.body as ApiEnvelope<{ id: string }>).data.id;
+
+      const res = await request(app.getHttpServer())
+        .patch(`/bookings/${bookingId}/status`)
+        .set('Authorization', `Bearer ${patientAToken}`)
+        .send({ status: 'CANCELLED' })
+        .expect(403);
+
+      expect(res.body.success).toBe(false);
+      expect(res.body.error.code).toBe(403);
+      expect(res.body.error.message).toBe('You can only update your own bookings.');
+    });
   });
 });

@@ -27,6 +27,7 @@ Quick map of automated test coverage currently available in this repository.
       - physiotherapist: create consultation, mark transaction paid.
     - Ownership negative path (`describe('Ownership negative paths')`):
       - patient A cannot mark patient B notification as read (`404 Notification not found`).
+      - patient A cannot update patient B booking status (`403 You can only update your own bookings`).
 
 ### Response shaping
 
