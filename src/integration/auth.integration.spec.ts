@@ -379,4 +379,126 @@ describe('Core integration (real DB, no service mocks)', () => {
     expect(forbiddenRes.body.success).toBe(false);
     expect(forbiddenRes.body.error.code).toBe(403);
   });
+
+  describe('RBAC negative paths', () => {
+    it('returns 403 when physiotherapist creates a consultation', async () => {
+      const registerRes = await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({
+          fullName: 'Therapist No Consult',
+          email: 'therapist-no-consult@mail.com',
+          password: 'password123',
+          role: UserRole.PHYSIOTHERAPIST,
+        })
+        .expect(201);
+      const token = (registerRes.body as AuthResponse).data.accessToken;
+
+      const res = await request(app.getHttpServer())
+        .post('/consultations')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          physiotherapistId: '22222222-2222-4222-8222-222222222222',
+          complaint: 'Should be rejected by RBAC before validation.',
+        })
+        .expect(403);
+
+      expect(res.body.success).toBe(false);
+      expect(res.body.error.code).toBe(403);
+    });
+
+    it('returns 403 when patient creates an availability slot', async () => {
+      const registerRes = await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({
+          fullName: 'Patient No Slots',
+          email: 'patient-no-slots@mail.com',
+          password: 'password123',
+          role: UserRole.PATIENT,
+        })
+        .expect(201);
+      const token = (registerRes.body as AuthResponse).data.accessToken;
+
+      const res = await request(app.getHttpServer())
+        .post('/physiotherapists/me/availability-slots')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          slotDate: '2099-12-01',
+          startTime: '2099-12-01T09:00:00.000Z',
+          endTime: '2099-12-01T10:00:00.000Z',
+        })
+        .expect(403);
+
+      expect(res.body.success).toBe(false);
+      expect(res.body.error.code).toBe(403);
+    });
+
+    it('returns 403 when patient opens admin dashboard overview', async () => {
+      const registerRes = await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({
+          fullName: 'Patient No Admin',
+          email: 'patient-no-admin@mail.com',
+          password: 'password123',
+          role: UserRole.PATIENT,
+        })
+        .expect(201);
+      const token = (registerRes.body as AuthResponse).data.accessToken;
+
+      const res = await request(app.getHttpServer())
+        .get('/admin/dashboard/overview')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(403);
+
+      expect(res.body.success).toBe(false);
+      expect(res.body.error.code).toBe(403);
+    });
+
+    it('returns 403 when patient broadcasts an admin notification', async () => {
+      const registerRes = await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({
+          fullName: 'Patient No Broadcast',
+          email: 'patient-no-broadcast@mail.com',
+          password: 'password123',
+          role: UserRole.PATIENT,
+        })
+        .expect(201);
+      const token = (registerRes.body as AuthResponse).data.accessToken;
+
+      const res = await request(app.getHttpServer())
+        .post('/admin/notifications/broadcast')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          title: 'Should never send',
+          body: 'Patient must not reach this handler.',
+        })
+        .expect(403);
+
+      expect(res.body.success).toBe(false);
+      expect(res.body.error.code).toBe(403);
+    });
+
+    it('returns 403 when physiotherapist marks a transaction as paid', async () => {
+      const registerRes = await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({
+          fullName: 'Therapist No Pay',
+          email: 'therapist-no-pay@mail.com',
+          password: 'password123',
+          role: UserRole.PHYSIOTHERAPIST,
+        })
+        .expect(201);
+      const token = (registerRes.body as AuthResponse).data.accessToken;
+
+      const res = await request(app.getHttpServer())
+        .patch(
+          '/transactions/33333333-3333-4333-8333-333333333333/pay',
+        )
+        .set('Authorization', `Bearer ${token}`)
+        .expect(403);
+
+      expect(res.body.success).toBe(false);
+      expect(res.body.error.code).toBe(403);
+    });
+  });
 });

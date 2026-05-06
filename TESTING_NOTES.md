@@ -22,7 +22,9 @@ Quick map of automated test coverage currently available in this repository.
     - `register -> login -> /auth/me`
     - patient `create consultation -> create booking` with approved therapist.
     - booking transaction lifecycle: `create transaction -> pay -> admin refund`.
-    - RBAC negative path: patient receives `403` when calling admin-only refund endpoint.
+    - RBAC negative paths (`describe('RBAC negative paths')`):
+      - patient: admin refund, admin dashboard, broadcast notification, create availability slot.
+      - physiotherapist: create consultation, mark transaction paid.
 
 ### Response shaping
 
@@ -77,5 +79,5 @@ Quick map of automated test coverage currently available in this repository.
 
 - Deeper integration/e2e flow tests across modules:
   - auth -> create slot -> create booking -> transaction -> notification.
-- Negative-path tests for more role/ownership edge cases in controller layer (integration suite now covers admin refund RBAC denial for patients).
+- Negative-path tests for more role/ownership edge cases (service-layer ownership, e.g. marking another user’s notification read).
 - Optional: coverage threshold in Jest config to enforce minimum baseline.
