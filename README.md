@@ -88,7 +88,7 @@ For a coverage map, what each suite asserts, and the latest local results, see [
    - `DATABASE_URL` → Postgres connection string from the linked DB.
    - `JWT_SECRET` → strong random secret (do **not** reuse the example).
    - `PORT` → Railway provides this; the app listens on `process.env.PORT`.
-3. Build/start commands:
+3. Build/start commands (also set in-repo via [`railway.json`](./railway.json) so Railway always runs compile + correct start):
    - **Build**: `npm run build`
    - **Start**: `npm run start:prod`
    - `postinstall` automatically runs `prisma generate`.
@@ -100,6 +100,10 @@ For a coverage map, what each suite asserts, and the latest local results, see [
 
 > Local Prisma CLI loads `.env` automatically via `prisma.config.ts` (`import 'dotenv/config'`).
 > When running migrations against Railway from your laptop, use the **public** Postgres URL (e.g. `*.proxy.rlwy.net`); `*.railway.internal` only resolves inside Railway.
+
+### Jika container crash dengan `MODULE_NOT_FOUND` / `cjs/loader`
+
+Biasanya `dist/main.js` tidak ada karena **build TypeScript tidak pernah jalan** di tahap build Railway, atau `npm install` melewati devDependencies sehingga `tsc` tidak tersedia. Perbaikan di repo ini: `railway.json` memaksa `npm run build`, dan `typescript` dipasang sebagai **dependency** agar compiler selalu ada saat build. Setelah push, buka tab **Build Logs** (bukan hanya Runtime) dan pastikan baris `tsc` / `npm run build` sukses sebelum start.
 
 ## Documentation map
 
