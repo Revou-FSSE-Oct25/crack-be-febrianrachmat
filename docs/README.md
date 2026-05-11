@@ -9,7 +9,6 @@ All technical writeups previously scattered at the repo root now live here, grou
   - `0x` — Foundation (architecture, runtime, contracts)
   - `1x` — Feature documentation (one file per domain module)
   - `3x` — Quality (hardening, testing notes)
-  - `4x` — Submission / delivery
 - Open files in numeric order if you are new to the project.
 - Open files by category if you are looking up a specific topic.
 
@@ -52,12 +51,6 @@ How the API is hardened and tested.
 | [`30-hardening-testing-baseline.md`](./30-hardening-testing-baseline.md) | Global exception filter, health resilience, pagination DTO, first unit tests. |
 | [`31-testing-notes.md`](./31-testing-notes.md) | Full automated-test coverage map (unit + controller + e2e-lite + real integration) and how to run them. |
 
-## 4x. Submission
-
-| File | Topic |
-|---|---|
-| [`40-submission-readiness-checklist.md`](./40-submission-readiness-checklist.md) | Final QA checklist mapped to the project rubric. |
-
 ---
 
 ## Quick reference
@@ -66,4 +59,3 @@ How the API is hardened and tested.
 - **Authenticate from Postman/Swagger**: see `10-auth-feature.md` + `04-swagger-api-docs.md`.
 - **Understand the data model**: see `02-database-schema.md`.
 - **Run tests / check coverage**: see `31-testing-notes.md`.
-- **Confirm rubric coverage before submission**: see `40-submission-readiness-checklist.md`.

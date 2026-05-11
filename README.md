@@ -108,11 +108,9 @@ For a coverage map, what each suite asserts, and the latest local results, see [
 | Foundation (NestJS, Prisma, response shape, Swagger) | [`docs/01..04`](./docs/README.md#0x-foundation) |
 | Per-feature API + business rules | [`docs/10..19`](./docs/README.md#1x-features) |
 | Hardening + testing | [`docs/30..31`](./docs/README.md#3x-quality) |
-| Submission rubric checklist | [`docs/40-submission-readiness-checklist.md`](./docs/40-submission-readiness-checklist.md) |
 
 ## Conventions
 
 - Every successful response is wrapped as `{ success, data, meta? }`; errors as `{ success: false, error, timestamp, path }` (see [`docs/03-response-standardization.md`](./docs/03-response-standardization.md)).
 - All routes are JWT-protected by default; public endpoints are explicitly tagged with `@Public()`.
 - Role checks use `@Roles(UserRole.X)` + the global `RolesGuard`; ownership is enforced at the service layer.
-- Commits in this repo are intentionally author-only — no AI co-author trailers (see `.githooks/README.md`).
