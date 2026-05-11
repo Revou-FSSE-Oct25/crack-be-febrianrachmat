@@ -32,7 +32,7 @@ describe('Bookings listing (e2e-lite)', () => {
     listMyBookings: jest.fn(),
     updateBookingStatus: jest.fn(),
     createTransaction: jest.fn(),
-    markTransactionPaid: jest.fn(),
+    markTransactionPaidByAdmin: jest.fn(),
     refundTransactionByAdmin: jest.fn(),
     listTransactions: jest.fn(),
   };

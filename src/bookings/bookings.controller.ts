@@ -99,14 +99,13 @@ export class BookingsController {
     return this.bookingsService.createTransaction(req.user as AuthUser, dto);
   }
 
-  @Roles(UserRole.PATIENT)
-  @Patch('transactions/:transactionId/pay')
-  @ApiOperation({ summary: 'Mark transaction as paid (dummy payment)' })
-  markPaid(@Req() req: Request, @Param('transactionId') transactionId: string) {
-    return this.bookingsService.markTransactionPaid(
-      req.user as AuthUser,
-      transactionId,
-    );
+  @Roles(UserRole.ADMIN)
+  @Patch('admin/transactions/:transactionId/pay')
+  @ApiOperation({
+    summary: 'Confirm pending transaction as paid (admin / system dummy)',
+  })
+  markPaidByAdmin(@Param('transactionId') transactionId: string) {
+    return this.bookingsService.markTransactionPaidByAdmin(transactionId);
   }
 
   @Roles(UserRole.ADMIN)

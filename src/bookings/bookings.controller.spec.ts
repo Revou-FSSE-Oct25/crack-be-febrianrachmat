@@ -10,7 +10,7 @@ describe('BookingsController', () => {
     listMyBookings: jest.fn(),
     updateBookingStatus: jest.fn(),
     createTransaction: jest.fn(),
-    markTransactionPaid: jest.fn(),
+    markTransactionPaidByAdmin: jest.fn(),
     refundTransactionByAdmin: jest.fn(),
     listTransactions: jest.fn(),
   };
@@ -90,6 +90,18 @@ describe('BookingsController', () => {
     expect(bookingsServiceMock.refundTransactionByAdmin).toHaveBeenCalledWith(
       'tx-1',
       dto,
+    );
+  });
+
+  it('delegates mark paid by admin', async () => {
+    bookingsServiceMock.markTransactionPaidByAdmin.mockResolvedValue({
+      id: 'tx-1',
+    });
+
+    await controller.markPaidByAdmin('tx-1');
+
+    expect(bookingsServiceMock.markTransactionPaidByAdmin).toHaveBeenCalledWith(
+      'tx-1',
     );
   });
 });

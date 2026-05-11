@@ -208,7 +208,7 @@ describe('Core integration (real DB, no service mocks)', () => {
     );
   });
 
-  it('booking transaction lifecycle works: create -> pay -> admin refund', async () => {
+  it('booking transaction lifecycle works: create -> admin pay -> admin refund', async () => {
     const adminRegisterRes = await request(app.getHttpServer())
       .post('/auth/register')
       .send({
@@ -292,8 +292,8 @@ describe('Core integration (real DB, no service mocks)', () => {
     const transactionId = (transactionCreateRes.body as ApiEnvelope<{ id: string }>).data.id;
 
     const payRes = await request(app.getHttpServer())
-      .patch(`/transactions/${transactionId}/pay`)
-      .set('Authorization', `Bearer ${patientToken}`)
+      .patch(`/admin/transactions/${transactionId}/pay`)
+      .set('Authorization', `Bearer ${adminToken}`)
       .expect(200);
     expect((payRes.body as ApiEnvelope<{ status: string }>).data.status).toBe('PAID');
 
@@ -308,6 +308,29 @@ describe('Core integration (real DB, no service mocks)', () => {
   });
 
   it('cross-module flow works: slot booking -> chat -> payment -> notifications', async () => {
+    const adminRegisterRes = await request(app.getHttpServer())
+      .post('/auth/register')
+      .send({
+        fullName: 'Cross Flow Admin',
+        email: 'cross-flow-admin@mail.com',
+        password: 'password123',
+        role: UserRole.PATIENT,
+      })
+      .expect(201);
+    const adminUserId = (adminRegisterRes.body as AuthResponse).data.user.id;
+    await prisma.user.update({
+      where: { id: adminUserId },
+      data: { role: UserRole.ADMIN },
+    });
+    const adminLoginRes = await request(app.getHttpServer())
+      .post('/auth/login')
+      .send({
+        email: 'cross-flow-admin@mail.com',
+        password: 'password123',
+      })
+      .expect(201);
+    const adminToken = (adminLoginRes.body as AuthResponse).data.accessToken;
+
     const patientRegisterRes = await request(app.getHttpServer())
       .post('/auth/register')
       .send({
@@ -418,8 +441,8 @@ describe('Core integration (real DB, no service mocks)', () => {
     const transactionId = (transactionRes.body as ApiEnvelope<{ id: string }>).data.id;
 
     await request(app.getHttpServer())
-      .patch(`/transactions/${transactionId}/pay`)
-      .set('Authorization', `Bearer ${patientToken}`)
+      .patch(`/admin/transactions/${transactionId}/pay`)
+      .set('Authorization', `Bearer ${adminToken}`)
       .expect(200);
 
     const patientNotificationsRes = await request(app.getHttpServer())
@@ -430,7 +453,7 @@ describe('Core integration (real DB, no service mocks)', () => {
       Array<{ title: string }>
     >).data;
     expect(
-      patientNotifications.some((item) => item.title === 'Payment Successful'),
+      patientNotifications.some((item) => item.title === 'Payment Confirmed'),
     ).toBe(true);
 
     const therapistNotificationsRes = await request(app.getHttpServer())
@@ -634,10 +657,12 @@ describe('Core integration (real DB, no service mocks)', () => {
       .expect(201);
     const transactionId = (transactionCreateRes.body as ApiEnvelope<{ id: string }>).data.id;
 
-    await request(app.getHttpServer())
-      .patch(`/transactions/${transactionId}/pay`)
-      .set('Authorization', `Bearer ${patientToken}`)
-      .expect(200);
+    // Move transaction to PAID directly via prisma so we can isolate refund-RBAC assertion;
+    // payment confirmation itself is admin-only and tested separately.
+    await prisma.transaction.update({
+      where: { id: transactionId },
+      data: { status: 'PAID', paidAt: new Date() },
+    });
 
     const forbiddenRes = await request(app.getHttpServer())
       .patch(`/admin/transactions/${transactionId}/refund`)
@@ -761,7 +786,7 @@ describe('Core integration (real DB, no service mocks)', () => {
 
       const res = await request(app.getHttpServer())
         .patch(
-          '/transactions/33333333-3333-4333-8333-333333333333/pay',
+          '/admin/transactions/33333333-3333-4333-8333-333333333333/pay',
         )
         .set('Authorization', `Bearer ${token}`)
         .expect(403);
@@ -951,7 +976,7 @@ describe('Core integration (real DB, no service mocks)', () => {
       );
     });
 
-    it("returns 404 when patient A pays patient B's transaction", async () => {
+    it("returns 400 when patient A creates a transaction on patient B's booking", async () => {
       const patientARegisterRes = await request(app.getHttpServer())
         .post('/auth/register')
         .send({
@@ -1009,25 +1034,19 @@ describe('Core integration (real DB, no service mocks)', () => {
         .expect(201);
       const bookingId = (bookingRes.body as ApiEnvelope<{ id: string }>).data.id;
 
-      const transactionRes = await request(app.getHttpServer())
+      const res = await request(app.getHttpServer())
         .post('/transactions')
-        .set('Authorization', `Bearer ${patientBToken}`)
+        .set('Authorization', `Bearer ${patientAToken}`)
         .send({
           bookingId,
           amount: 150000,
           paymentMethod: 'BANK_TRANSFER',
         })
-        .expect(201);
-      const transactionId = (transactionRes.body as ApiEnvelope<{ id: string }>).data.id;
-
-      const res = await request(app.getHttpServer())
-        .patch(`/transactions/${transactionId}/pay`)
-        .set('Authorization', `Bearer ${patientAToken}`)
-        .expect(404);
+        .expect(400);
 
       expect(res.body.success).toBe(false);
-      expect(res.body.error.code).toBe(404);
-      expect(res.body.error.message).toBe('Transaction not found.');
+      expect(res.body.error.code).toBe(400);
+      expect(res.body.error.message).toBe('Booking not found for current patient.');
     });
 
     it("returns 403 when therapist A updates therapist B's consultation", async () => {

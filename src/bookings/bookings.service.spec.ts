@@ -1,8 +1,4 @@
-import {
-  BadRequestException,
-  ForbiddenException,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import {
   BookingStatus,
   ConsultationStatus,
@@ -417,8 +413,7 @@ describe('BookingsService', () => {
     ).rejects.toThrow(BadRequestException);
   });
 
-  it('marks own pending transaction as paid', async () => {
-    prismaMock.patientProfile.findUnique.mockResolvedValue({ id: 'patient-1' });
+  it('marks pending transaction as paid by admin', async () => {
     prismaMock.transaction.findUnique.mockResolvedValue({
       id: 'tx-1',
       patientId: 'patient-1',
@@ -428,9 +423,13 @@ describe('BookingsService', () => {
       id: 'tx-1',
       status: TransactionStatus.PAID,
     });
+    prismaMock.patientProfile.findUnique.mockResolvedValue({
+      id: 'patient-1',
+      userId: 'user-patient-1',
+    });
     notificationsMock.createSystemNotification.mockResolvedValue(undefined);
 
-    await service.markTransactionPaid(PATIENT_USER, 'tx-1');
+    await service.markTransactionPaidByAdmin('tx-1');
 
     expect(prismaMock.transaction.update).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -442,8 +441,7 @@ describe('BookingsService', () => {
     );
   });
 
-  it('still marks transaction paid even if notification fails', async () => {
-    prismaMock.patientProfile.findUnique.mockResolvedValue({ id: 'patient-1' });
+  it('still marks transaction paid by admin even if notification fails', async () => {
     prismaMock.transaction.findUnique.mockResolvedValue({
       id: 'tx-1',
       patientId: 'patient-1',
@@ -453,13 +451,15 @@ describe('BookingsService', () => {
       id: 'tx-1',
       status: TransactionStatus.PAID,
     });
+    prismaMock.patientProfile.findUnique.mockResolvedValue({
+      id: 'patient-1',
+      userId: 'user-patient-1',
+    });
     notificationsMock.createSystemNotification.mockRejectedValue(
       new Error('notification service down'),
     );
 
-    await expect(
-      service.markTransactionPaid(PATIENT_USER, 'tx-1'),
-    ).resolves.toEqual(
+    await expect(service.markTransactionPaidByAdmin('tx-1')).resolves.toEqual(
       expect.objectContaining({
         id: 'tx-1',
         status: TransactionStatus.PAID,
@@ -467,10 +467,12 @@ describe('BookingsService', () => {
     );
   });
 
-  it('rejects mark paid when role is not patient', async () => {
-    await expect(
-      service.markTransactionPaid(ADMIN_USER, 'tx-1'),
-    ).rejects.toThrow(ForbiddenException);
+  it('rejects mark paid by admin when transaction not found', async () => {
+    prismaMock.transaction.findUnique.mockResolvedValue(null);
+
+    await expect(service.markTransactionPaidByAdmin('tx-404')).rejects.toThrow(
+      NotFoundException,
+    );
   });
 
   it('rejects refund when transaction is not PAID', async () => {

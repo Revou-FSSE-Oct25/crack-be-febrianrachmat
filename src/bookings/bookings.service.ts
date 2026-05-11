@@ -471,19 +471,12 @@ export class BookingsService {
     });
   }
 
-  async markTransactionPaid(authUser: AuthUser, transactionId: string) {
-    if (authUser.role !== UserRole.PATIENT) {
-      throw new ForbiddenException('Only patient can mark payment.');
-    }
-    const patient = await this.prisma.patientProfile.findUnique({
-      where: { userId: authUser.sub },
-    });
-    if (!patient) throw new BadRequestException('Patient profile not found.');
-
+  /** Konfirmasi pembayaran dummy — hanya admin (pasien tidak boleh self-confirm). */
+  async markTransactionPaidByAdmin(transactionId: string) {
     const transaction = await this.prisma.transaction.findUnique({
       where: { id: transactionId },
     });
-    if (!transaction || transaction.patientId !== patient.id) {
+    if (!transaction) {
       throw new NotFoundException('Transaction not found.');
     }
     if (transaction.status !== TransactionStatus.PENDING) {
@@ -495,11 +488,17 @@ export class BookingsService {
       data: { status: TransactionStatus.PAID, paidAt: new Date() },
     });
 
-    await this.safeNotify(
-      authUser.sub,
-      'Payment Successful',
-      'Your transaction has been marked as PAID.',
-    );
+    const patient = await this.prisma.patientProfile.findUnique({
+      where: { id: transaction.patientId },
+      select: { userId: true },
+    });
+    if (patient) {
+      await this.safeNotify(
+        patient.userId,
+        'Payment Confirmed',
+        'Your payment has been confirmed by admin. Transaction is now PAID.',
+      );
+    }
 
     return updated;
   }
