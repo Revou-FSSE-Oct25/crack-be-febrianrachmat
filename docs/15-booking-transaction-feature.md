@@ -58,8 +58,10 @@ Unit test coverage for this transition guard is available in `src/bookings/booki
 ### `POST /transactions` (Role: `PATIENT`)
 Create pending transaction for own booking.
 
-### `PATCH /transactions/:transactionId/pay` (Role: `PATIENT`)
-Simulate successful payment (`PENDING -> PAID`).
+### `PATCH /admin/transactions/:transactionId/pay` (Role: `ADMIN`)
+Confirm a pending dummy payment (`PENDING -> PAID`). Patient submits payment intent through `POST /transactions`; admin/system confirms it.
+
+> Note: there is **no** patient-side self-confirm endpoint. Patients cannot mark their own transactions as paid; only `ADMIN` can perform the dummy confirmation. This mirrors a real payment-gateway callback, where the server (not the buyer) updates the status.
 
 ### `PATCH /admin/transactions/:transactionId/refund` (Role: `ADMIN`)
 Simulate refund (`PAID -> REFUNDED`) with required reason.

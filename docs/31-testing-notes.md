@@ -4,19 +4,21 @@ Quick map of automated test coverage currently available in this repository.
 
 ## How to run tests
 
-- Run all tests: `npm test`
-- Type-check/build check: `npm run build`
-- Run real integration tests (no service mocks): `npm run test:integration`
-- Run unit + integration sequentially (recommended): `npm run test:all`
-- Run unit test coverage report: `npm run test:cov`
+- Unit + e2e-lite (mocked, fast): `npm test`
+  - The unit Jest config now ignores `*.integration.spec.ts`, so this run never touches the database.
+- Type-check / build check: `npm run build`
+- Real integration tests (no service mocks, hits a real Postgres): `npm run test:integration`
+  - Requires `TEST_DATABASE_URL` (or `DATABASE_URL`) pointing at a **dedicated test database**. Do **not** point this at production data.
+  - Always runs serially (`--runInBand`) to avoid `40P01` deadlocks during `TRUNCATE ... CASCADE`.
+- Both stages, sequentially: `npm run test:all`
+- Unit test coverage report: `npm run test:cov`
 - Seed demo data locally: `npm run prisma:seed`
 
 ## Latest local results (example)
 
-- `npm run test:all`:
-  - unit/e2e-lite: 15 suites, 100 tests ✅
-  - integration: 1 suite, 22 tests ✅
-- `npm run test:cov` (unit/e2e-lite only): ~77.7% statements, ~55.2% branches, ~70.2% functions, ~76.7% lines
+- `npm test` (unit + e2e-lite): 14 suites, 79 tests ✅
+- `npm run test:integration`: 1 suite, ~22 tests against a dedicated test DB ✅ (run locally before submission)
+- `npm run test:cov` (unit/e2e-lite only): ~77% statements / ~55% branches / ~70% functions / ~76% lines on the latest local run
 
 ## Current test coverage map
 
@@ -31,17 +33,17 @@ Quick map of automated test coverage currently available in this repository.
   - Real integration flows (no service mocks) using `AppModule` + real database:
     - `register -> login -> /auth/me`
     - patient `create consultation -> create booking` with approved therapist.
-    - booking transaction lifecycle: `create transaction -> pay -> admin refund`.
+    - booking transaction lifecycle: `create transaction -> admin pay -> admin refund`.
     - cross-module happy path: `slot -> consultation -> booking(slot) -> chat -> payment -> notifications -> notifications/read-all`.
     - status transition chain: consultation `ACCEPTED`, booking `CONFIRMED -> IN_PROGRESS -> COMPLETED`, and completed booking cannot be cancelled (`400`).
     - RBAC negative paths (`describe('RBAC negative paths')`):
       - patient: admin refund, admin dashboard, broadcast notification, create availability slot.
-      - physiotherapist: create consultation, mark transaction paid.
+      - physiotherapist: create consultation, mark transaction paid (admin-only endpoint).
     - Ownership negative path (`describe('Ownership negative paths')`):
       - patient A cannot mark patient B notification as read (`404 Notification not found`).
       - patient A cannot update patient B booking status (`403 You can only update your own bookings`).
       - patient A cannot cancel patient B consultation (`403 You can only update your own consultations`).
-      - patient A cannot pay patient B transaction (`404 Transaction not found`).
+      - patient A cannot create a transaction on patient B booking (`400 Booking not found for current patient`).
       - therapist A cannot update therapist B consultation (`403 You can only update your own consultations`).
       - therapist A cannot update therapist B booking (`403 You can only update your own bookings`).
       - therapist A cannot update/delete therapist B availability slot (`404 Availability slot not found`).
