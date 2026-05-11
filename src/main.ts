@@ -54,12 +54,14 @@ async function bootstrap(): Promise<void> {
   });
 
   const port = process.env.PORT ? Number(process.env.PORT) : 3000;
-  await app.listen(port);
+  // Bind to 0.0.0.0 supaya container/PaaS (Railway, dll.) bisa menjangkau service
+  // dari luar; default Nest hanya listen di interface lokal.
+  await app.listen(port, '0.0.0.0');
 
-  // Keep startup logs simple for local development.
   // eslint-disable-next-line no-console
-  console.log(`API is running on http://localhost:${port}`);
-  console.log(`Swagger docs: http://localhost:${port}/docs`);
+  console.log(`API is running on port ${port}`);
+  // eslint-disable-next-line no-console
+  console.log(`Swagger docs available at /docs`);
 }
 
 void bootstrap();
