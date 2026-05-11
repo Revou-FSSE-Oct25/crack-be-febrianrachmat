@@ -1,0 +1,14 @@
+node_modules
+dist
+coverage
+.git
+.githooks
+.cursor
+docs
+**/*.spec.ts
+**/*.e2e.spec.ts
+**/*.integration.spec.ts
+.env
+.env.*
+*.log
+README.md
