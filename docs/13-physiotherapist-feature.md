@@ -38,6 +38,12 @@ Request example:
 Important behavior:
 - Any profile update resets verification to `PENDING` for re-review.
 
+#### `POST /physiotherapists/me/online` (Role: `PHYSIOTHERAPIST`)
+Lightweight **presence heartbeat** (no body). Sets `onlineUntil` on the
+caller's profile to approximately **now + 5 minutes**. The therapist SPA
+should call this about once per minute while a dashboard tab is open so
+patients can filter "online now" in browse.
+
 ### Patient/Admin Browse Endpoint
 
 #### `GET /physiotherapists` (Roles: `PATIENT`, `ADMIN`)
@@ -46,6 +52,8 @@ Browse approved therapists only.
 Query params:
 - `categoryId` (optional, UUID)
 - `search` (optional)
+- `onlineNow` (optional boolean): when `true`, only therapists whose
+  `onlineUntil` is still in the future are returned
 - `page` (default `1`)
 - `limit` (default `10`, max `50`)
 
@@ -60,6 +68,9 @@ Response shape:
   "items": []
 }
 ```
+
+Each item includes `onlineUntil` when set (ISO timestamp). Clients can treat
+`onlineUntil > now()` as a green "online" badge.
 
 ### Admin Verification Endpoints
 
@@ -95,3 +106,4 @@ Validation rules:
 - `PhysiotherapistProfile` belongs to `User`.
 - `PhysiotherapistProfile` can reference one `Category`.
 - `verificationStatus`, `rejectionReason`, `verifiedAt` are managed by admin flow.
+- `onlineUntil` supports the optional "online now" browse filter (Phase 2).

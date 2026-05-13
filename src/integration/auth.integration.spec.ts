@@ -700,6 +700,71 @@ describe('Core integration (real DB, no service mocks)', () => {
     expect(forbiddenRes.body.error.code).toBe(403);
   });
 
+  it('therapist heartbeat sets onlineUntil and onlineNow browse includes them', async () => {
+    const ptRes = await request(app.getHttpServer())
+      .post('/auth/register')
+      .send({
+        fullName: 'PT Online Pulse',
+        email: 'pt-online-pulse@mail.com',
+        password: 'password123',
+        role: UserRole.PHYSIOTHERAPIST,
+      })
+      .expect(201);
+    const ptToken = (ptRes.body as AuthResponse).data.accessToken;
+    const ptUserId = (ptRes.body as AuthResponse).data.user.id;
+    const ptProfile = await prisma.physiotherapistProfile.findUnique({
+      where: { userId: ptUserId },
+    });
+    expect(ptProfile).toBeTruthy();
+    await prisma.physiotherapistProfile.update({
+      where: { id: ptProfile!.id },
+      data: { verificationStatus: 'APPROVED', verifiedAt: new Date() },
+    });
+
+    const patientRes = await request(app.getHttpServer())
+      .post('/auth/register')
+      .send({
+        fullName: 'Patient Browse Online',
+        email: 'patient-browse-online@mail.com',
+        password: 'password123',
+        role: UserRole.PATIENT,
+      })
+      .expect(201);
+    const patientToken = (patientRes.body as AuthResponse).data.accessToken;
+
+    const beforePulse = await request(app.getHttpServer())
+      .get('/physiotherapists?onlineNow=true&limit=50')
+      .set('Authorization', `Bearer ${patientToken}`)
+      .expect(200);
+    const beforeIds = (
+      beforePulse.body as ApiEnvelope<Array<{ id: string }>>
+    ).data.map((x) => x.id);
+    expect(beforeIds).not.toContain(ptProfile!.id);
+
+    const pulseRes = await request(app.getHttpServer())
+      .post('/physiotherapists/me/online')
+      .set('Authorization', `Bearer ${ptToken}`)
+      .expect(201);
+    expect(
+      (pulseRes.body as ApiEnvelope<{ onlineUntil: string }>).data.onlineUntil,
+    ).toBeTruthy();
+
+    const afterPulse = await request(app.getHttpServer())
+      .get('/physiotherapists?onlineNow=true&limit=50')
+      .set('Authorization', `Bearer ${patientToken}`)
+      .expect(200);
+    const afterIds = (
+      afterPulse.body as ApiEnvelope<Array<{ id: string }>>
+    ).data.map((x) => x.id);
+    expect(afterIds).toContain(ptProfile!.id);
+
+    const patientPulse = await request(app.getHttpServer())
+      .post('/physiotherapists/me/online')
+      .set('Authorization', `Bearer ${patientToken}`)
+      .expect(403);
+    expect(patientPulse.body.success).toBe(false);
+  });
+
   describe('RBAC negative paths', () => {
     it('returns 403 when physiotherapist creates a consultation', async () => {
       const registerRes = await request(app.getHttpServer())

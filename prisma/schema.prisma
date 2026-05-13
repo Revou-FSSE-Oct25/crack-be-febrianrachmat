@@ -117,6 +117,10 @@ model PhysiotherapistProfile {
   verificationStatus     TherapistVerificationStatus @default(PENDING)
   rejectionReason        String?
   verifiedAt             DateTime?
+  /// Heartbeat presence: set by POST /physiotherapists/me/online while the
+  /// therapist has the dashboard open. If `onlineUntil` is in the future,
+  /// the therapist is considered "online now" for browse filters.
+  onlineUntil            DateTime?
   createdAt              DateTime @default(now())
   updatedAt              DateTime @updatedAt
 
@@ -126,6 +130,8 @@ model PhysiotherapistProfile {
   consultations          Consultation[]
   bookings               Booking[]
   reviews                Review[]
+
+  @@index([verificationStatus, onlineUntil])
 }
 
 model AvailabilitySlot {

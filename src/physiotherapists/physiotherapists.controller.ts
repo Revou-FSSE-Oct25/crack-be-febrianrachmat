@@ -4,6 +4,7 @@ import {
   Get,
   Param,
   Patch,
+  Post,
   Query,
   Req,
 } from '@nestjs/common';
@@ -42,6 +43,18 @@ export class PhysiotherapistsController {
     return this.physiotherapistsService.updateMyProfile(
       req.user as AuthUser,
       dto,
+    );
+  }
+
+  @Roles(UserRole.PHYSIOTHERAPIST)
+  @Post('physiotherapists/me/online')
+  @ApiOperation({
+    summary:
+      'Heartbeat: mark therapist as online for the next few minutes (browse filter)',
+  })
+  touchOnline(@Req() req: Request) {
+    return this.physiotherapistsService.touchMyOnlinePresence(
+      req.user as AuthUser,
     );
   }
 

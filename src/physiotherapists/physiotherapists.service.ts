@@ -15,12 +15,38 @@ import { BrowsePhysiotherapistsQueryDto } from './dto/browse-physiotherapists-qu
 import { UpdatePhysiotherapistProfileDto } from './dto/update-physiotherapist-profile.dto';
 import { VerifyPhysiotherapistDto } from './dto/verify-physiotherapist.dto';
 
+/** Presence window after each heartbeat (therapist dashboard tab open). */
+const ONLINE_HEARTBEAT_TTL_MS = 5 * 60 * 1000;
+
 @Injectable()
 export class PhysiotherapistsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notificationsService: NotificationsService,
   ) {}
+
+  /**
+   * Bump `onlineUntil` so this therapist appears in GET /physiotherapists
+   * when `onlineNow=true`. Call every ~60s from the therapist SPA while
+   * they are actively using the app.
+   */
+  async touchMyOnlinePresence(authUser: AuthUser) {
+    const profile = await this.prisma.physiotherapistProfile.findUnique({
+      where: { userId: authUser.sub },
+    });
+    if (!profile) {
+      throw new NotFoundException('Physiotherapist profile not found.');
+    }
+    const until = new Date(Date.now() + ONLINE_HEARTBEAT_TTL_MS);
+    return this.prisma.physiotherapistProfile.update({
+      where: { id: profile.id },
+      data: { onlineUntil: until },
+      select: {
+        id: true,
+        onlineUntil: true,
+      },
+    });
+  }
 
   async getMyProfile(authUser: AuthUser) {
     const profile = await this.prisma.physiotherapistProfile.findUnique({
@@ -90,9 +116,13 @@ export class PhysiotherapistsService {
     const limit = query.limit ?? 10;
     const skip = (page - 1) * limit;
 
+    const now = new Date();
     const where: Prisma.PhysiotherapistProfileWhereInput = {
       verificationStatus: TherapistVerificationStatus.APPROVED,
       categoryId: query.categoryId,
+      ...(query.onlineNow === true
+        ? { onlineUntil: { gt: now } }
+        : {}),
       OR: query.search
         ? [
             { user: { fullName: { contains: query.search, mode: 'insensitive' } } },

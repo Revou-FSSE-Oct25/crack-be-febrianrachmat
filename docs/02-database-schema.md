@@ -28,6 +28,8 @@ This document explains the Prisma data model for your physiotherapy booking plat
 - Belongs to exactly one `User`.
 - Connected to one `Category` (specialization).
 - Has many schedules, consultations, bookings, and reviews.
+- `onlineUntil` (nullable): bumped by dashboard heartbeat; when in the future,
+  the therapist counts as "online now" for browse filters.
 
 ### 4) Category
 - Master data for therapist specialization (for example: sports injury, post-surgery).
