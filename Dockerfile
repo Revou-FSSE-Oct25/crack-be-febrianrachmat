@@ -37,6 +37,10 @@ RUN npm ci --omit=dev
 
 COPY --from=builder /app/dist ./dist
 
+COPY docker-entrypoint.sh ./
+RUN chmod +x docker-entrypoint.sh
+
 EXPOSE 3000
 
-CMD ["node", "dist/main.js"]
+# Migrate deploy runs every start. Seed only when Railway/env sets RUN_DB_SEED=true (once), then turn it off.
+CMD ["./docker-entrypoint.sh"]
