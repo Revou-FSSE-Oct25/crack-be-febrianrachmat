@@ -37,6 +37,31 @@ export class BookingsService {
     [BookingStatus.CANCELLED]: [],
   };
 
+  /**
+   * Lifecycle of a paid online consultation. `IN_PROGRESS` is reserved for the
+   * payment-confirmation pathway (admin marks transaction PAID) and is NOT a
+   * value a patient/therapist can set directly via the status endpoint.
+   */
+  private readonly allowedConsultationTransitions: Record<
+    ConsultationStatus,
+    ConsultationStatus[]
+  > = {
+    [ConsultationStatus.REQUESTED]: [
+      ConsultationStatus.ACCEPTED,
+      ConsultationStatus.CANCELLED,
+    ],
+    [ConsultationStatus.ACCEPTED]: [
+      ConsultationStatus.IN_PROGRESS,
+      ConsultationStatus.CANCELLED,
+    ],
+    [ConsultationStatus.IN_PROGRESS]: [
+      ConsultationStatus.COMPLETED,
+      ConsultationStatus.CANCELLED,
+    ],
+    [ConsultationStatus.COMPLETED]: [],
+    [ConsultationStatus.CANCELLED]: [],
+  };
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly notificationsService: NotificationsService,
@@ -60,11 +85,15 @@ export class BookingsService {
       throw new BadRequestException('Physiotherapist is not approved yet.');
     }
 
+    // Snapshot the therapist's current consultationFee into the consultation
+    // so the price the patient sees + pays is locked in, even if the therapist
+    // later updates their profile fee.
     const consultation = await this.prisma.consultation.create({
       data: {
         patientId: patientProfile.id,
         physiotherapistId: therapist.id,
         complaint: dto.complaint,
+        feeSnapshot: therapist.consultationFee,
       },
       include: {
         patient: { include: { user: { select: { fullName: true, email: true } } } },
@@ -77,7 +106,7 @@ export class BookingsService {
     await this.safeNotify(
       therapist.userId,
       'New Consultation Request',
-      'A patient submitted a new consultation request for you.',
+      'A patient submitted a new consultation request for you. Please accept to let them proceed to payment.',
     );
 
     return consultation;
@@ -137,6 +166,20 @@ export class BookingsService {
       throw new NotFoundException('Consultation not found.');
     }
 
+    // IN_PROGRESS is only set automatically when admin confirms a paid
+    // transaction. Disallow setting it through this generic endpoint to
+    // prevent bypassing the payment requirement.
+    if (
+      dto.status === ConsultationStatus.IN_PROGRESS &&
+      authUser.role !== UserRole.ADMIN
+    ) {
+      throw new BadRequestException(
+        'IN_PROGRESS is set automatically once the transaction is paid; not assignable manually.',
+      );
+    }
+
+    this.assertValidConsultationTransition(consultation.status, dto.status);
+
     if (authUser.role === UserRole.PHYSIOTHERAPIST) {
       const therapist = await this.prisma.physiotherapistProfile.findUnique({
         where: { userId: authUser.sub },
@@ -144,10 +187,12 @@ export class BookingsService {
       if (!therapist || therapist.id !== consultation.physiotherapistId) {
         throw new ForbiddenException('You can only update your own consultations.');
       }
+      // Therapist can accept a fresh request, mark a paid session complete,
+      // or cancel before payment. They cannot directly set IN_PROGRESS.
       const allowedForTherapist: ConsultationStatus[] = [
         ConsultationStatus.ACCEPTED,
-        ConsultationStatus.REJECTED,
         ConsultationStatus.COMPLETED,
+        ConsultationStatus.CANCELLED,
       ];
       if (!allowedForTherapist.includes(dto.status)) {
         throw new BadRequestException('Invalid status for physiotherapist.');
@@ -159,8 +204,24 @@ export class BookingsService {
       if (!patient || patient.id !== consultation.patientId) {
         throw new ForbiddenException('You can only update your own consultations.');
       }
-      if (dto.status !== ConsultationStatus.CANCELLED) {
-        throw new BadRequestException('Patient can only cancel consultation.');
+      // Patient can cancel anytime before completion, or mark the active
+      // session complete once it's already in progress.
+      if (
+        dto.status === ConsultationStatus.COMPLETED &&
+        consultation.status !== ConsultationStatus.IN_PROGRESS
+      ) {
+        throw new BadRequestException(
+          'Patient can only mark a consultation completed once it is IN_PROGRESS.',
+        );
+      }
+      const allowedForPatient: ConsultationStatus[] = [
+        ConsultationStatus.CANCELLED,
+        ConsultationStatus.COMPLETED,
+      ];
+      if (!allowedForPatient.includes(dto.status)) {
+        throw new BadRequestException(
+          'Patient can only cancel or complete a consultation.',
+        );
       }
     } else if (authUser.role !== UserRole.ADMIN) {
       throw new ForbiddenException('Unauthorized role.');
@@ -168,7 +229,17 @@ export class BookingsService {
 
     const updated = await this.prisma.consultation.update({
       where: { id: consultationId },
-      data: { status: dto.status },
+      data: {
+        status: dto.status,
+        acceptedAt:
+          dto.status === ConsultationStatus.ACCEPTED && !consultation.acceptedAt
+            ? new Date()
+            : undefined,
+        completedAt:
+          dto.status === ConsultationStatus.COMPLETED
+            ? new Date()
+            : undefined,
+      },
     });
 
     if (authUser.role === UserRole.PHYSIOTHERAPIST) {
@@ -177,10 +248,14 @@ export class BookingsService {
         select: { userId: true },
       });
       if (patient) {
+        const message =
+          dto.status === ConsultationStatus.ACCEPTED
+            ? `Your consultation has been accepted. Please proceed to payment (Rp ${consultation.feeSnapshot.toString()}) to start the session.`
+            : `Your consultation status is now ${dto.status}.`;
         await this.safeNotify(
           patient.userId,
           'Consultation Status Updated',
-          `Your consultation status is now ${dto.status}.`,
+          message,
         );
       }
     } else if (authUser.role === UserRole.PATIENT) {
@@ -191,13 +266,34 @@ export class BookingsService {
       if (therapist) {
         await this.safeNotify(
           therapist.userId,
-          'Consultation Cancelled',
-          'A patient cancelled a consultation request.',
+          dto.status === ConsultationStatus.COMPLETED
+            ? 'Consultation Completed'
+            : 'Consultation Cancelled',
+          dto.status === ConsultationStatus.COMPLETED
+            ? 'A patient marked the consultation as completed.'
+            : 'A patient cancelled a consultation request.',
         );
       }
     }
 
     return updated;
+  }
+
+  private assertValidConsultationTransition(
+    currentStatus: ConsultationStatus,
+    nextStatus: ConsultationStatus,
+  ): void {
+    if (currentStatus === nextStatus) {
+      throw new BadRequestException(
+        `Consultation status is already ${currentStatus}.`,
+      );
+    }
+    const allowed = this.allowedConsultationTransitions[currentStatus] ?? [];
+    if (!allowed.includes(nextStatus)) {
+      throw new BadRequestException(
+        `Invalid consultation status transition from ${currentStatus} to ${nextStatus}.`,
+      );
+    }
   }
 
   async createBooking(authUser: AuthUser, dto: CreateBookingDto) {
@@ -237,10 +333,7 @@ export class BookingsService {
           'consultationId does not match the selected physiotherapist.',
         );
       }
-      if (
-        consultation.status === ConsultationStatus.REJECTED ||
-        consultation.status === ConsultationStatus.CANCELLED
-      ) {
+      if (consultation.status === ConsultationStatus.CANCELLED) {
         throw new BadRequestException(
           `Cannot create booking from consultation with status ${consultation.status}.`,
         );
@@ -453,16 +546,67 @@ export class BookingsService {
     });
     if (!patient) throw new BadRequestException('Patient profile not found.');
 
-    const booking = await this.prisma.booking.findUnique({
-      where: { id: dto.bookingId },
+    // DTO already validates "at least one of bookingId / consultationId" but
+    // we still enforce XOR here so service-layer callers get the same guard.
+    if (Boolean(dto.bookingId) === Boolean(dto.consultationId)) {
+      throw new BadRequestException(
+        'Provide exactly one of bookingId or consultationId for a transaction.',
+      );
+    }
+
+    if (dto.bookingId) {
+      const booking = await this.prisma.booking.findUnique({
+        where: { id: dto.bookingId },
+      });
+      if (!booking || booking.patientId !== patient.id) {
+        throw new BadRequestException('Booking not found for current patient.');
+      }
+      return this.prisma.transaction.create({
+        data: {
+          bookingId: booking.id,
+          patientId: patient.id,
+          amount: new Prisma.Decimal(dto.amount),
+          paymentMethod: dto.paymentMethod,
+          status: TransactionStatus.PENDING,
+        },
+      });
+    }
+
+    // Consultation transaction path: only allowed once the therapist has
+    // ACCEPTED the request. This is what gates "pay-first" and ensures the
+    // patient never pays for a session the therapist never agreed to take.
+    const consultation = await this.prisma.consultation.findUnique({
+      where: { id: dto.consultationId },
     });
-    if (!booking || booking.patientId !== patient.id) {
-      throw new BadRequestException('Booking not found for current patient.');
+    if (!consultation || consultation.patientId !== patient.id) {
+      throw new BadRequestException(
+        'Consultation not found for current patient.',
+      );
+    }
+    if (consultation.status !== ConsultationStatus.ACCEPTED) {
+      throw new BadRequestException(
+        `Consultation must be ACCEPTED before payment (current status: ${consultation.status}).`,
+      );
+    }
+
+    // Block duplicate pending/paid transactions on the same consultation.
+    const existing = await this.prisma.transaction.findFirst({
+      where: {
+        consultationId: consultation.id,
+        status: {
+          in: [TransactionStatus.PENDING, TransactionStatus.PAID],
+        },
+      },
+    });
+    if (existing) {
+      throw new BadRequestException(
+        'A pending or paid transaction already exists for this consultation.',
+      );
     }
 
     return this.prisma.transaction.create({
       data: {
-        bookingId: booking.id,
+        consultationId: consultation.id,
         patientId: patient.id,
         amount: new Prisma.Decimal(dto.amount),
         paymentMethod: dto.paymentMethod,
@@ -471,10 +615,17 @@ export class BookingsService {
     });
   }
 
-  /** Konfirmasi pembayaran dummy — hanya admin (pasien tidak boleh self-confirm). */
+  /**
+   * Konfirmasi pembayaran dummy — hanya admin (pasien tidak boleh self-confirm).
+   *
+   * Side-effect penting (Phase 1): kalau transaksi tertaut ke sebuah
+   * Consultation, status consultation otomatis dipindah dari ACCEPTED →
+   * IN_PROGRESS sehingga chat ter-unlock. Ini fondasi flow pay-first.
+   */
   async markTransactionPaidByAdmin(transactionId: string) {
     const transaction = await this.prisma.transaction.findUnique({
       where: { id: transactionId },
+      include: { consultation: { include: { physiotherapist: true } } },
     });
     if (!transaction) {
       throw new NotFoundException('Transaction not found.');
@@ -483,9 +634,28 @@ export class BookingsService {
       throw new BadRequestException('Only pending transaction can be marked as paid.');
     }
 
-    const updated = await this.prisma.transaction.update({
-      where: { id: transactionId },
-      data: { status: TransactionStatus.PAID, paidAt: new Date() },
+    const now = new Date();
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.transaction.update({
+        where: { id: transactionId },
+        data: { status: TransactionStatus.PAID, paidAt: now },
+      });
+
+      if (transaction.consultationId && transaction.consultation) {
+        if (
+          transaction.consultation.status === ConsultationStatus.ACCEPTED
+        ) {
+          await tx.consultation.update({
+            where: { id: transaction.consultationId },
+            data: {
+              status: ConsultationStatus.IN_PROGRESS,
+              startedAt: now,
+            },
+          });
+        }
+      }
+
+      return updated;
     });
 
     const patient = await this.prisma.patientProfile.findUnique({
@@ -496,7 +666,16 @@ export class BookingsService {
       await this.safeNotify(
         patient.userId,
         'Payment Confirmed',
-        'Your payment has been confirmed by admin. Transaction is now PAID.',
+        transaction.consultationId
+          ? 'Pembayaran konsultasi dikonfirmasi. Sesi chat sekarang aktif — silakan mulai.'
+          : 'Your payment has been confirmed by admin. Transaction is now PAID.',
+      );
+    }
+    if (transaction.consultationId && transaction.consultation) {
+      await this.safeNotify(
+        transaction.consultation.physiotherapist.userId,
+        'Consultation Ready',
+        'Pasien telah membayar. Sesi konsultasi sekarang aktif, silakan mulai chat.',
       );
     }
 
@@ -509,19 +688,38 @@ export class BookingsService {
   ) {
     const transaction = await this.prisma.transaction.findUnique({
       where: { id: transactionId },
+      include: { consultation: true },
     });
     if (!transaction) throw new NotFoundException('Transaction not found.');
     if (transaction.status !== TransactionStatus.PAID) {
       throw new BadRequestException('Only paid transaction can be refunded.');
     }
 
-    const updated = await this.prisma.transaction.update({
-      where: { id: transactionId },
-      data: {
-        status: TransactionStatus.REFUNDED,
-        refundedAt: new Date(),
-        refundReason: dto.reason,
-      },
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.transaction.update({
+        where: { id: transactionId },
+        data: {
+          status: TransactionStatus.REFUNDED,
+          refundedAt: new Date(),
+          refundReason: dto.reason,
+        },
+      });
+
+      // Refunding a consultation transaction implicitly cancels the session
+      // so the chat gating immediately closes.
+      if (transaction.consultationId && transaction.consultation) {
+        if (
+          transaction.consultation.status === ConsultationStatus.IN_PROGRESS ||
+          transaction.consultation.status === ConsultationStatus.ACCEPTED
+        ) {
+          await tx.consultation.update({
+            where: { id: transaction.consultationId },
+            data: { status: ConsultationStatus.CANCELLED },
+          });
+        }
+      }
+
+      return updated;
     });
 
     const patient = await this.prisma.patientProfile.findUnique({

@@ -11,16 +11,32 @@ describe('BookingsService', () => {
   const prismaMock = {
     patientProfile: { findUnique: jest.fn() },
     physiotherapistProfile: { findUnique: jest.fn() },
-    consultation: { findUnique: jest.fn(), findMany: jest.fn() },
+    consultation: {
+      findUnique: jest.fn(),
+      findMany: jest.fn(),
+      update: jest.fn(),
+    },
     availabilitySlot: { findUnique: jest.fn() },
     booking: { findUnique: jest.fn(), findMany: jest.fn() },
     transaction: {
       findUnique: jest.fn(),
+      findFirst: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
       findMany: jest.fn(),
     },
     $transaction: jest.fn(),
+  };
+
+  /**
+   * Helper: route `prisma.$transaction(cb)` through the same mocked Prisma
+   * methods so service-level transactions can be observed in tests without
+   * spinning up a real DB connection.
+   */
+  const wireDefault$transaction = () => {
+    prismaMock.$transaction.mockImplementation(
+      async (cb: (tx: typeof prismaMock) => Promise<unknown>) => cb(prismaMock),
+    );
   };
   const notificationsMock = {
     createSystemNotification: jest.fn(),
@@ -59,6 +75,7 @@ describe('BookingsService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    wireDefault$transaction();
   });
 
   // Booking status transition guards
@@ -222,34 +239,6 @@ describe('BookingsService', () => {
     ).rejects.toThrow(BadRequestException);
   });
 
-  it('rejects booking when consultation status is REJECTED', async () => {
-    prismaMock.patientProfile.findUnique.mockResolvedValue({ id: 'patient-1' });
-    prismaMock.physiotherapistProfile.findUnique.mockResolvedValue({
-      id: 'therapist-1',
-      userId: 'therapist-user-1',
-      verificationStatus: 'APPROVED',
-    });
-    prismaMock.consultation.findUnique.mockResolvedValue({
-      id: 'consultation-1',
-      patientId: 'patient-1',
-      physiotherapistId: 'therapist-1',
-      status: ConsultationStatus.REJECTED,
-    });
-
-    await expect(
-      service.createBooking(
-        PATIENT_USER,
-        {
-          consultationId: 'consultation-1',
-          physiotherapistId: 'therapist-1',
-          appointmentType: 'CLINIC_VISIT',
-          appointmentDate: '2099-05-10T09:00:00.000Z',
-          clinicAddress: 'Jl. Klinik Utama 123',
-        },
-      ),
-    ).rejects.toThrow(BadRequestException);
-  });
-
   it('rejects booking when consultation status is CANCELLED', async () => {
     prismaMock.patientProfile.findUnique.mockResolvedValue({ id: 'patient-1' });
     prismaMock.physiotherapistProfile.findUnique.mockResolvedValue({
@@ -394,6 +383,95 @@ describe('BookingsService', () => {
     );
   });
 
+  it('creates consultation transaction once therapist has accepted', async () => {
+    prismaMock.patientProfile.findUnique.mockResolvedValue({ id: 'patient-1' });
+    prismaMock.consultation.findUnique.mockResolvedValue({
+      id: 'consultation-1',
+      patientId: 'patient-1',
+      status: ConsultationStatus.ACCEPTED,
+    });
+    prismaMock.transaction.findFirst.mockResolvedValue(null);
+    prismaMock.transaction.create.mockResolvedValue({ id: 'tx-c-1' });
+
+    await service.createTransaction(PATIENT_USER, {
+      consultationId: 'consultation-1',
+      amount: 150000,
+      paymentMethod: 'BANK_TRANSFER',
+    });
+
+    expect(prismaMock.transaction.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          consultationId: 'consultation-1',
+          patientId: 'patient-1',
+          status: TransactionStatus.PENDING,
+        }),
+      }),
+    );
+  });
+
+  it('rejects consultation transaction before therapist accepts (status=REQUESTED)', async () => {
+    prismaMock.patientProfile.findUnique.mockResolvedValue({ id: 'patient-1' });
+    prismaMock.consultation.findUnique.mockResolvedValue({
+      id: 'consultation-1',
+      patientId: 'patient-1',
+      status: ConsultationStatus.REQUESTED,
+    });
+
+    await expect(
+      service.createTransaction(PATIENT_USER, {
+        consultationId: 'consultation-1',
+        amount: 150000,
+        paymentMethod: 'BANK_TRANSFER',
+      }),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it('rejects duplicate pending transaction on same consultation', async () => {
+    prismaMock.patientProfile.findUnique.mockResolvedValue({ id: 'patient-1' });
+    prismaMock.consultation.findUnique.mockResolvedValue({
+      id: 'consultation-1',
+      patientId: 'patient-1',
+      status: ConsultationStatus.ACCEPTED,
+    });
+    prismaMock.transaction.findFirst.mockResolvedValue({
+      id: 'tx-existing',
+      status: TransactionStatus.PENDING,
+    });
+
+    await expect(
+      service.createTransaction(PATIENT_USER, {
+        consultationId: 'consultation-1',
+        amount: 150000,
+        paymentMethod: 'BANK_TRANSFER',
+      }),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it('rejects transaction when neither bookingId nor consultationId is provided', async () => {
+    prismaMock.patientProfile.findUnique.mockResolvedValue({ id: 'patient-1' });
+
+    await expect(
+      service.createTransaction(PATIENT_USER, {
+        amount: 150000,
+        paymentMethod: 'BANK_TRANSFER',
+      } as never),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it('rejects transaction when both bookingId and consultationId are provided', async () => {
+    prismaMock.patientProfile.findUnique.mockResolvedValue({ id: 'patient-1' });
+
+    await expect(
+      service.createTransaction(PATIENT_USER, {
+        bookingId: 'booking-1',
+        consultationId: 'consultation-1',
+        amount: 150000,
+        paymentMethod: 'BANK_TRANSFER',
+      }),
+    ).rejects.toThrow(BadRequestException);
+  });
+
   it('rejects transaction creation when booking is not owned by patient', async () => {
     prismaMock.patientProfile.findUnique.mockResolvedValue({ id: 'patient-1' });
     prismaMock.booking.findUnique.mockResolvedValue({
@@ -413,10 +491,13 @@ describe('BookingsService', () => {
     ).rejects.toThrow(BadRequestException);
   });
 
-  it('marks pending transaction as paid by admin', async () => {
+  it('marks pending booking transaction as paid by admin', async () => {
     prismaMock.transaction.findUnique.mockResolvedValue({
       id: 'tx-1',
       patientId: 'patient-1',
+      bookingId: 'booking-1',
+      consultationId: null,
+      consultation: null,
       status: TransactionStatus.PENDING,
     });
     prismaMock.transaction.update.mockResolvedValue({
@@ -439,12 +520,55 @@ describe('BookingsService', () => {
         }),
       }),
     );
+    // Booking-only transactions never touch consultation.
+    expect(prismaMock.consultation.update).not.toHaveBeenCalled();
+  });
+
+  it('promotes consultation to IN_PROGRESS when admin marks its transaction paid', async () => {
+    prismaMock.transaction.findUnique.mockResolvedValue({
+      id: 'tx-c-1',
+      patientId: 'patient-1',
+      bookingId: null,
+      consultationId: 'consultation-1',
+      consultation: {
+        id: 'consultation-1',
+        status: ConsultationStatus.ACCEPTED,
+        physiotherapist: { userId: 'therapist-user-1' },
+      },
+      status: TransactionStatus.PENDING,
+    });
+    prismaMock.transaction.update.mockResolvedValue({
+      id: 'tx-c-1',
+      status: TransactionStatus.PAID,
+    });
+    prismaMock.consultation.update.mockResolvedValue({
+      id: 'consultation-1',
+      status: ConsultationStatus.IN_PROGRESS,
+    });
+    prismaMock.patientProfile.findUnique.mockResolvedValue({
+      id: 'patient-1',
+      userId: 'user-patient-1',
+    });
+
+    await service.markTransactionPaidByAdmin('tx-c-1');
+
+    expect(prismaMock.consultation.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'consultation-1' },
+        data: expect.objectContaining({
+          status: ConsultationStatus.IN_PROGRESS,
+        }),
+      }),
+    );
   });
 
   it('still marks transaction paid by admin even if notification fails', async () => {
     prismaMock.transaction.findUnique.mockResolvedValue({
       id: 'tx-1',
       patientId: 'patient-1',
+      bookingId: 'booking-1',
+      consultationId: null,
+      consultation: null,
       status: TransactionStatus.PENDING,
     });
     prismaMock.transaction.update.mockResolvedValue({

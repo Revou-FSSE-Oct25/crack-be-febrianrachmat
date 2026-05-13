@@ -39,24 +39,36 @@ This document explains the Prisma data model for your physiotherapy booking plat
 - Used to control booking availability.
 
 ### 6) Consultation
-- Initial case discussion between patient and therapist.
-- Status lifecycle: `REQUESTED -> ACCEPTED/REJECTED -> COMPLETED/CANCELLED`.
-- Can have one conversation and multiple bookings.
+- Paid online chat session between patient and therapist.
+- Status lifecycle: `REQUESTED -> ACCEPTED -> IN_PROGRESS -> COMPLETED`,
+  with `CANCELLED` reachable from any non-terminal state.
+- `feeSnapshot` locks the therapist's `consultationFee` at creation time.
+- `acceptedAt` / `startedAt` / `completedAt` audit the lifecycle.
+- `IN_PROGRESS` is only entered after the linked transaction is marked PAID
+  by admin — this is the "pay-first chat unlock" gate.
 
 ### 7) Conversation, ConversationParticipant, Message
 - Simple API-based chat (non-realtime).
 - A conversation has multiple participants and messages.
 - Messages store sender and content.
+- Reads work regardless of consultation status (audit trail). New
+  conversations and new messages require the linked consultation to be
+  `IN_PROGRESS` (admin moderation bypasses this).
 
 ### 8) Booking
-- Appointment record (home visit or clinic).
-- Links patient + therapist (+ optional consultation).
+- Appointment record for an in-person visit (home or clinic).
+- Links patient + therapist (+ optional consultation, optional slot).
 - Status lifecycle supports operational flow and cancellation.
 
 ### 9) Transaction
-- Dummy payment model.
-- Linked to booking and patient.
+- Dummy payment model. Linked to **either** a `Booking` OR a `Consultation`
+  via the nullable `bookingId` / `consultationId` foreign keys (XOR rule
+  enforced at the service layer).
 - Status lifecycle: `PENDING`, `PAID`, `REFUNDED`, `FAILED`.
+- When a consultation transaction is marked `PAID`, the consultation is
+  auto-promoted from `ACCEPTED` to `IN_PROGRESS`.
+- When a consultation transaction is refunded, the consultation is
+  auto-`CANCELLED`.
 - Supports admin refund simulation.
 
 ### 10) Review

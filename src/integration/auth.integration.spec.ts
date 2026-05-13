@@ -387,6 +387,32 @@ describe('Core integration (real DB, no service mocks)', () => {
       .expect(201);
     const consultationId = (consultationRes.body as ApiEnvelope<{ id: string }>).data.id;
 
+    // Phase 1 pay-first ceremony: therapist accept → patient pays → admin
+    // confirms → consultation auto-promotes to IN_PROGRESS so chat unlocks.
+    await request(app.getHttpServer())
+      .patch(`/consultations/${consultationId}/status`)
+      .set('Authorization', `Bearer ${therapistToken}`)
+      .send({ status: 'ACCEPTED' })
+      .expect(200);
+
+    const consultTxRes = await request(app.getHttpServer())
+      .post('/transactions')
+      .set('Authorization', `Bearer ${patientToken}`)
+      .send({
+        consultationId,
+        amount: 150000,
+        paymentMethod: 'BANK_TRANSFER',
+      })
+      .expect(201);
+    const consultTxId = (consultTxRes.body as ApiEnvelope<{ id: string }>).data.id;
+
+    await request(app.getHttpServer())
+      .patch(`/admin/transactions/${consultTxId}/pay`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+
+    // The follow-up Booking models a physical visit follow-up after the chat
+    // — it remains a separate appointment artefact decoupled from the chat.
     const bookingRes = await request(app.getHttpServer())
       .post('/bookings')
       .set('Authorization', `Bearer ${patientToken}`)
@@ -1342,6 +1368,13 @@ describe('Core integration (real DB, no service mocks)', () => {
         .expect(201);
       const consultationId = (consultationRes.body as ApiEnvelope<{ id: string }>).data.id;
 
+      // Pay-first ceremony is exercised elsewhere; here we focus on RBAC, so
+      // shortcut consultation into IN_PROGRESS via direct DB patch.
+      await prisma.consultation.update({
+        where: { id: consultationId },
+        data: { status: 'IN_PROGRESS', startedAt: new Date() },
+      });
+
       const conversationRes = await request(app.getHttpServer())
         .post('/chat/conversations')
         .set('Authorization', `Bearer ${patientBToken}`)
@@ -1414,6 +1447,12 @@ describe('Core integration (real DB, no service mocks)', () => {
         })
         .expect(201);
       const consultationId = (consultationRes.body as ApiEnvelope<{ id: string }>).data.id;
+
+      // Shortcut: chat lock is tested elsewhere; this test focuses on RBAC.
+      await prisma.consultation.update({
+        where: { id: consultationId },
+        data: { status: 'IN_PROGRESS', startedAt: new Date() },
+      });
 
       const conversationRes = await request(app.getHttpServer())
         .post('/chat/conversations')

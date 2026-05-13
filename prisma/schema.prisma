@@ -22,7 +22,7 @@ enum TherapistVerificationStatus {
 enum ConsultationStatus {
   REQUESTED
   ACCEPTED
-  REJECTED
+  IN_PROGRESS
   COMPLETED
   CANCELLED
 }
@@ -146,12 +146,21 @@ model AvailabilitySlot {
 }
 
 model Consultation {
-  /// Non-realtime consultation request before/alongside booking flow.
+  /// Paid online consultation. Lifecycle: REQUESTED (patient creates) →
+  /// ACCEPTED (therapist accepts) → IN_PROGRESS (payment confirmed by admin,
+  /// chat unlocked) → COMPLETED (either party closes the session). CANCELLED
+  /// can happen at any stage (patient cancels before payment, or admin refunds).
   id                  String   @id @default(uuid())
   patientId           String
   physiotherapistId   String
   complaint           String
   status              ConsultationStatus @default(REQUESTED)
+  /// Snapshot of physiotherapist consultationFee at creation time, so changes
+  /// on the therapist profile don't retroactively affect the agreed price.
+  feeSnapshot         Decimal  @db.Decimal(12, 2)
+  acceptedAt          DateTime?
+  startedAt           DateTime?
+  completedAt         DateTime?
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 
@@ -159,6 +168,7 @@ model Consultation {
   physiotherapist     PhysiotherapistProfile @relation(fields: [physiotherapistId], references: [id], onDelete: Cascade)
   conversation        Conversation?
   bookings            Booking[]
+  transactions        Transaction[]
 
   @@index([patientId, physiotherapistId, status])
 }
@@ -229,9 +239,13 @@ model Booking {
 }
 
 model Transaction {
-  /// Dummy payment transaction; status changes simulate payment/refund flows.
+  /// Dummy payment transaction. Each transaction is linked to EITHER a Booking
+  /// (physical visit) OR a Consultation (paid online chat) — exactly one of the
+  /// two FK columns is non-null. Status flow: PENDING → PAID (admin confirm) /
+  /// REFUNDED (admin refund) / FAILED.
   id               String   @id @default(uuid())
-  bookingId        String
+  bookingId        String?
+  consultationId   String?
   patientId        String
   amount           Decimal  @db.Decimal(12, 2)
   paymentMethod    PaymentMethod
@@ -242,10 +256,12 @@ model Transaction {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
-  booking          Booking        @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  booking          Booking?       @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  consultation     Consultation?  @relation(fields: [consultationId], references: [id], onDelete: Cascade)
   patient          PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
 
   @@index([bookingId, status])
+  @@index([consultationId, status])
 }
 
 model Review {

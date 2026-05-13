@@ -1,14 +1,26 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { UserRole } from '@prisma/client';
+import { ConsultationStatus, UserRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { AuthUser } from '../common/types/auth-user.type';
 import { CreateOrGetConversationDto } from './dto/create-or-get-conversation.dto';
 import { SendMessageDto } from './dto/send-message.dto';
+
+/**
+ * Phase 1 pay-first rule of thumb:
+ *   - Anyone authorised on the consultation may READ the conversation history,
+ *     so refunded sessions still keep an audit trail visible.
+ *   - Only IN_PROGRESS consultations accept NEW messages or new conversations
+ *     (admin is exempt to allow moderation).
+ */
+const SENDABLE_CONSULTATION_STATUSES: ConsultationStatus[] = [
+  ConsultationStatus.IN_PROGRESS,
+];
 
 @Injectable()
 export class ChatService {
@@ -32,6 +44,17 @@ export class ChatService {
     }
 
     this.assertCanAccessConsultation(authUser, consultation);
+
+    // Opening (or re-opening) a chat is only meaningful once the patient has
+    // paid and the session is IN_PROGRESS. Admin can always open for moderation.
+    if (
+      authUser.role !== UserRole.ADMIN &&
+      !SENDABLE_CONSULTATION_STATUSES.includes(consultation.status)
+    ) {
+      throw new BadRequestException(
+        `Chat is locked. Consultation must be IN_PROGRESS (current: ${consultation.status}).`,
+      );
+    }
 
     if (consultation.conversation) {
       return this.prisma.conversation.findUnique({
@@ -121,7 +144,34 @@ export class ChatService {
     conversationId: string,
     dto: SendMessageDto,
   ) {
-    await this.assertCanAccessConversation(authUser, conversationId);
+    const conversation = await this.assertCanAccessConversation(
+      authUser,
+      conversationId,
+    );
+
+    // Chat is locked unless the underlying consultation has been paid and is
+    // IN_PROGRESS. Admin bypasses this for moderation messages.
+    if (authUser.role !== UserRole.ADMIN) {
+      if (!conversation.consultationId) {
+        throw new BadRequestException(
+          'Conversation is not linked to a paid consultation.',
+        );
+      }
+      const consultation = await this.prisma.consultation.findUnique({
+        where: { id: conversation.consultationId },
+        select: { status: true },
+      });
+      if (
+        !consultation ||
+        !SENDABLE_CONSULTATION_STATUSES.includes(consultation.status)
+      ) {
+        throw new BadRequestException(
+          `Chat is locked. Consultation must be IN_PROGRESS (current: ${
+            consultation?.status ?? 'UNKNOWN'
+          }).`,
+        );
+      }
+    }
 
     // Ensure sender is listed as participant (especially useful for admin moderation messages).
     await this.ensureParticipant(conversationId, authUser.sub);
@@ -161,7 +211,7 @@ export class ChatService {
   private async assertCanAccessConversation(
     authUser: AuthUser,
     conversationId: string,
-  ): Promise<void> {
+  ) {
     const conversation = await this.prisma.conversation.findUnique({
       where: { id: conversationId },
       include: {
@@ -174,7 +224,7 @@ export class ChatService {
     }
 
     if (authUser.role === UserRole.ADMIN) {
-      return;
+      return conversation;
     }
 
     const isParticipant = conversation.participants.some(
@@ -184,6 +234,7 @@ export class ChatService {
     if (!isParticipant) {
       throw new ForbiddenException('You are not part of this conversation.');
     }
+    return conversation;
   }
 
   private async ensureParticipant(
