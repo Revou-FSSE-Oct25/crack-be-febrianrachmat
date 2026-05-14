@@ -8,6 +8,16 @@ Built with **NestJS + Prisma + PostgreSQL**, three roles (`ADMIN`, `PATIENT`, `P
 > Full technical documentation lives under [`docs/`](./docs/README.md).
 > If you are reviewing this project, start there.
 
+## Live API (Railway production)
+
+| | URL |
+| --- | --- |
+| Base URL | https://crack-be-febrianrachmat-production.up.railway.app |
+| Health check | https://crack-be-febrianrachmat-production.up.railway.app/health |
+| Swagger / OpenAPI UI | https://crack-be-febrianrachmat-production.up.railway.app/docs |
+
+Use the **Swagger** link to browse every endpoint, try requests, and authorize with a JWT from `POST /auth/login`. This is the backend URL to configure in the frontend (`NEXT_PUBLIC_API_URL` or equivalent), not the PostgreSQL connection string.
+
 ---
 
 ## Tech stack
@@ -18,7 +28,7 @@ Built with **NestJS + Prisma + PostgreSQL**, three roles (`ADMIN`, `PATIENT`, `P
 - **Validation**: `class-validator` + `class-transformer` + global `ValidationPipe`
 - **Docs**: Swagger / OpenAPI at `GET /docs`
 - **Testing**: Jest unit + controller delegation + e2e-lite + real integration suite
-- **Deployment**: Railway (managed Postgres + Node service)
+- **Deployment**: Railway (managed Postgres + Node service) — [live API](#live-api-railway-production)
 
 ## Repository layout
 
@@ -82,6 +92,8 @@ Default password (overridable with `SEED_DEFAULT_PASSWORD`): `password123`
 For a coverage map, what each suite asserts, and the latest local results, see [`docs/31-testing-notes.md`](./docs/31-testing-notes.md).
 
 ## Deployment (Railway)
+
+The deployed API for this repository is reachable at the URLs in [Live API (Railway production)](#live-api-railway-production) above.
 
 1. Create Postgres + Node service in Railway, link the repo.
 2. Set env vars in the Railway service:
