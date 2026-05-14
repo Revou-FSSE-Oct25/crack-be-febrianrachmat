@@ -25,6 +25,7 @@ describe('BookingsService', () => {
       update: jest.fn(),
       findMany: jest.fn(),
     },
+    message: { count: jest.fn() },
     $transaction: jest.fn(),
   };
 
@@ -41,9 +42,13 @@ describe('BookingsService', () => {
   const notificationsMock = {
     createSystemNotification: jest.fn(),
   };
+  const configMock = {
+    get: jest.fn().mockReturnValue(undefined),
+  };
   const service = new BookingsService(
     prismaMock as never,
     notificationsMock as never,
+    configMock as never,
   );
   const PATIENT_USER = {
     sub: 'patient-user-1',

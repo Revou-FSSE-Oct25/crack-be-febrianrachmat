@@ -27,6 +27,12 @@ enum ConsultationStatus {
   CANCELLED
 }
 
+/// Patient-selected response SLA for paid chat sessions (Phase 3 auto-refund).
+enum ConsultationSlaTier {
+  STANDARD
+  FAST_ONLINE
+}
+
 enum AppointmentType {
   HOME_VISIT
   CLINIC_VISIT
@@ -164,6 +170,10 @@ model Consultation {
   /// Snapshot of physiotherapist consultationFee at creation time, so changes
   /// on the therapist profile don't retroactively affect the agreed price.
   feeSnapshot         Decimal  @db.Decimal(12, 2)
+  /// How long the patient waits for the first therapist chat reply after payment
+  /// before an automatic refund (cron). FAST_ONLINE requires the therapist to
+  /// be heartbeat-online at consultation creation time.
+  slaTier               ConsultationSlaTier @default(STANDARD)
   acceptedAt          DateTime?
   startedAt           DateTime?
   completedAt         DateTime?
@@ -177,6 +187,7 @@ model Consultation {
   transactions        Transaction[]
 
   @@index([patientId, physiotherapistId, status])
+  @@index([status, startedAt])
 }
 
 model Conversation {

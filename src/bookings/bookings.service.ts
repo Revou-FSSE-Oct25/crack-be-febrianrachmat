@@ -2,11 +2,14 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import {
   AppointmentType,
   BookingStatus,
+  ConsultationSlaTier,
   ConsultationStatus,
   Prisma,
   TherapistVerificationStatus,
@@ -17,6 +20,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { AuthUser } from '../common/types/auth-user.type';
+import { consultationSlaWindowMinutes } from './consultation-sla.util';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { CreateConsultationDto } from './dto/create-consultation.dto';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
@@ -26,6 +30,8 @@ import { UpdateConsultationStatusDto } from './dto/update-consultation-status.dt
 
 @Injectable()
 export class BookingsService {
+  private readonly logger = new Logger(BookingsService.name);
+
   private readonly allowedBookingTransitions: Record<
     BookingStatus,
     BookingStatus[]
@@ -65,6 +71,7 @@ export class BookingsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notificationsService: NotificationsService,
+    private readonly configService: ConfigService,
   ) {}
 
   async createConsultation(authUser: AuthUser, dto: CreateConsultationDto) {
@@ -85,6 +92,16 @@ export class BookingsService {
       throw new BadRequestException('Physiotherapist is not approved yet.');
     }
 
+    const slaTier = dto.slaTier ?? ConsultationSlaTier.STANDARD;
+    const now = new Date();
+    if (slaTier === ConsultationSlaTier.FAST_ONLINE) {
+      if (!therapist.onlineUntil || therapist.onlineUntil <= now) {
+        throw new BadRequestException(
+          'Respons cepat hanya tersedia saat terapis sedang online (heartbeat aktif). Buka daftar fisioterapis, pastikan badge Online, lalu ajukan lagi.',
+        );
+      }
+    }
+
     // Snapshot the therapist's current consultationFee into the consultation
     // so the price the patient sees + pays is locked in, even if the therapist
     // later updates their profile fee.
@@ -94,6 +111,7 @@ export class BookingsService {
         physiotherapistId: therapist.id,
         complaint: dto.complaint,
         feeSnapshot: therapist.consultationFee,
+        slaTier,
       },
       include: {
         patient: { include: { user: { select: { fullName: true, email: true } } } },
@@ -688,7 +706,13 @@ export class BookingsService {
   ) {
     const transaction = await this.prisma.transaction.findUnique({
       where: { id: transactionId },
-      include: { consultation: true },
+      include: {
+        consultation: {
+          include: {
+            physiotherapist: { select: { userId: true } },
+          },
+        },
+      },
     });
     if (!transaction) throw new NotFoundException('Transaction not found.');
     if (transaction.status !== TransactionStatus.PAID) {
@@ -734,7 +758,104 @@ export class BookingsService {
       );
     }
 
+    const therapistUserId =
+      transaction.consultation?.physiotherapist?.userId;
+    if (therapistUserId) {
+      await this.safeNotify(
+        therapistUserId,
+        'Transaction Refunded',
+        `Transaksi konsultasi dikembalikan. Alasan: ${dto.reason}`,
+      );
+    }
+
     return updated;
+  }
+
+  /**
+   * Scan active paid consultations: if the therapist never sent any chat
+   * message since `startedAt` and the SLA window has passed, refund the PAID
+   * transaction (same DB path as admin refund).
+   */
+  async processConsultationSlaTimeouts(): Promise<{
+    checked: number;
+    refunded: number;
+  }> {
+    const fastRaw = this.configService.get<string>('CONSULTATION_SLA_FAST_MINUTES');
+    const stdRaw = this.configService.get<string>('CONSULTATION_SLA_STANDARD_MINUTES');
+    const fastMinutes = Math.max(1, Number(fastRaw) || 10);
+    const standardMinutes = Math.max(1, Number(stdRaw) || 24 * 60);
+    const now = new Date();
+
+    const sessions = await this.prisma.consultation.findMany({
+      where: {
+        status: ConsultationStatus.IN_PROGRESS,
+        startedAt: { not: null },
+      },
+      include: {
+        physiotherapist: { select: { userId: true } },
+        conversation: { select: { id: true } },
+      },
+    });
+
+    let refunded = 0;
+    for (const c of sessions) {
+      const startedAt = c.startedAt as Date;
+      const slaMinutes = consultationSlaWindowMinutes(
+        c.slaTier,
+        fastMinutes,
+        standardMinutes,
+      );
+      const deadline = new Date(startedAt.getTime() + slaMinutes * 60_000);
+      if (now <= deadline) {
+        continue;
+      }
+
+      const convId = c.conversation?.id;
+      let therapistReplied = false;
+      if (convId) {
+        const n = await this.prisma.message.count({
+          where: {
+            conversationId: convId,
+            senderId: c.physiotherapist.userId,
+            createdAt: { gte: startedAt },
+          },
+        });
+        therapistReplied = n > 0;
+      }
+      if (therapistReplied) {
+        continue;
+      }
+
+      const tx = await this.prisma.transaction.findFirst({
+        where: {
+          consultationId: c.id,
+          status: TransactionStatus.PAID,
+        },
+      });
+      if (!tx) {
+        continue;
+      }
+
+      const label =
+        c.slaTier === ConsultationSlaTier.FAST_ONLINE
+          ? `${slaMinutes} menit (respons cepat)`
+          : `${Math.round(slaMinutes / 60)} jam (standar)`;
+
+      try {
+        await this.refundTransactionByAdmin(tx.id, {
+          reason: `Pengembalian otomatis: tidak ada balasan terapis dalam batas ${label}.`,
+        });
+        refunded += 1;
+      } catch (err) {
+        this.logger.warn(
+          `SLA refund skipped for consultation ${c.id} / tx ${tx.id}: ${
+            err instanceof Error ? err.message : String(err)
+          }`,
+        );
+      }
+    }
+
+    return { checked: sessions.length, refunded };
   }
 
   async listTransactions(authUser: AuthUser, query: PaginationQueryDto) {

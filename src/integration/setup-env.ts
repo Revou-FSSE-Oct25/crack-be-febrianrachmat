@@ -11,3 +11,5 @@ if (!resolvedDatabaseUrl) {
 
 process.env.DATABASE_URL = resolvedDatabaseUrl;
 process.env.JWT_SECRET = process.env.JWT_SECRET ?? 'integration-test-secret';
+/** Disable SLA cron during integration tests (real DB, long-running suite). */
+process.env.CONSULTATION_SLA_CRON = 'false';

@@ -170,3 +170,37 @@ List transactions (patient sees own, admin sees all).
 - `Transaction` links to **either** `Booking` or `Consultation`, plus
   `patient`. Indexed by both `(bookingId, status)` and
   `(consultationId, status)`.
+
+---
+
+## Phase 3: Consultation SLA tier and auto-refund
+
+Each consultation stores `slaTier`: `STANDARD` (default) or `FAST_ONLINE`.
+
+- **STANDARD**: after the session is **paid** and moves to `IN_PROGRESS`, the
+  therapist must send at least one chat message within
+  `CONSULTATION_SLA_STANDARD_MINUTES` (default **1440** = 24 hours), measured
+  from `startedAt`.
+- **FAST_ONLINE**: same rule but
+  `CONSULTATION_SLA_FAST_MINUTES` (default **10**). The API only allows this
+  tier when the therapist has `onlineUntil` **after** the request time at
+  consultation **create** time.
+
+If the deadline passes with **no** therapist-authored message since
+`startedAt`, a scheduled job calls admin refund on the linked paid
+transaction (Indonesian auto-reason), cancels the consultation, and notifies
+patient and therapist.
+
+### Environment
+
+| Variable | Meaning |
+| -------- | ------- |
+| `CONSULTATION_SLA_CRON` | Set to `false` to disable the cron (e.g. tests). Default: enabled. |
+| `CONSULTATION_SLA_STANDARD_MINUTES` | SLA window for `STANDARD` (default 1440). |
+| `CONSULTATION_SLA_FAST_MINUTES` | SLA window for `FAST_ONLINE` (default 10). |
+
+### API
+
+`POST /consultations` accepts optional `slaTier`. Omitted or `STANDARD` keeps
+default; `FAST_ONLINE` is rejected with 400 if the therapist is not online at
+create time.
