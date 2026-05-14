@@ -15,8 +15,9 @@ Built with **NestJS + Prisma + PostgreSQL**, three roles (`ADMIN`, `PATIENT`, `P
 | Base URL | https://crack-be-febrianrachmat-production.up.railway.app |
 | Health check | https://crack-be-febrianrachmat-production.up.railway.app/health |
 | Swagger / OpenAPI UI | https://crack-be-febrianrachmat-production.up.railway.app/docs |
+| **Database ERD** (dbdiagram.io) | https://dbdiagram.io/d/Crack-Physio-6a05b6997a923b9472b2f884 |
 
-Use the **Swagger** link to browse every endpoint, try requests, and authorize with a JWT from `POST /auth/login`. This is the backend URL to configure in the frontend (`NEXT_PUBLIC_API_URL` or equivalent), not the PostgreSQL connection string.
+Use the **Swagger** link to browse every endpoint, try requests, and authorize with a JWT from `POST /auth/login`. This is the backend URL to configure in the frontend (`NEXT_PUBLIC_API_URL` or equivalent), not the PostgreSQL connection string. The **ERD** link opens the interactive database diagram; source DBML also lives in [`docs/database-erd.dbml`](./docs/database-erd.dbml) (see [`docs/02-database-schema.md`](./docs/02-database-schema.md)).
 
 ---
 
@@ -121,7 +122,7 @@ Biasanya `dist/main.js` tidak ada karena **build TypeScript tidak pernah jalan**
 
 | Category | Where |
 |---|---|
-| Foundation (NestJS, Prisma, response shape, Swagger) | [`docs/01..04`](./docs/README.md#0x-foundation) |
+| Foundation (NestJS, Prisma, response shape, Swagger, **ERD / DBML**) | [`docs/01..04`](./docs/README.md#0x-foundation) |
 | Per-feature API + business rules | [`docs/10..19`](./docs/README.md#1x-features) |
 | Hardening + testing | [`docs/30..31`](./docs/README.md#3x-quality) |
 

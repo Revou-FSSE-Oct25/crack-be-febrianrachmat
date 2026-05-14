@@ -21,7 +21,7 @@ Things that apply to every feature.
 | File | Topic |
 |---|---|
 | [`01-backend-foundation.md`](./01-backend-foundation.md) | NestJS bootstrap, Prisma wiring, health endpoint, env template. |
-| [`02-database-schema.md`](./02-database-schema.md) | Prisma data model: entities, relations, design decisions. |
+| [`02-database-schema.md`](./02-database-schema.md) | Prisma model, **published ERD on dbdiagram.io**, DBML (`database-erd.dbml`), Mermaid overview. |
 | [`03-response-standardization.md`](./03-response-standardization.md) | Success envelope (`{ success, data, meta }`) and error envelope. |
 | [`04-swagger-api-docs.md`](./04-swagger-api-docs.md) | Where to find OpenAPI docs and how to authorize from Swagger UI. |
 

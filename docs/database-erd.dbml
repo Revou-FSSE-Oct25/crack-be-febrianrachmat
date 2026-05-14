@@ -1,0 +1,260 @@
+// Physiotherapy platform — PostgreSQL schema (Prisma)
+// Published canvas: https://dbdiagram.io/d/Crack-Physio-6a05b6997a923b9472b2f884
+// Import this file at https://dbdiagram.io to edit / export PNG/PDF.
+// Keep in sync with prisma/schema.prisma
+
+Project physiotherapy_booking {
+  database_type: 'PostgreSQL'
+  Note: 'XOR: Transaction.bookingId XOR Transaction.consultationId (app). Consultation.slaTier + cron auto-refund (Phase 3).'
+}
+
+Enum UserRole {
+  ADMIN
+  PATIENT
+  PHYSIOTHERAPIST
+}
+
+Enum TherapistVerificationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+Enum ConsultationStatus {
+  REQUESTED
+  ACCEPTED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+Enum ConsultationSlaTier {
+  STANDARD
+  FAST_ONLINE
+}
+
+Enum AppointmentType {
+  HOME_VISIT
+  CLINIC_VISIT
+}
+
+Enum BookingStatus {
+  PENDING
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+Enum TransactionStatus {
+  PENDING
+  PAID
+  REFUNDED
+  FAILED
+}
+
+Enum PaymentMethod {
+  BANK_TRANSFER
+  E_WALLET
+  CREDIT_CARD
+  QRIS
+}
+
+Table User {
+  id uuid [pk]
+  fullName varchar
+  email varchar [unique, not null]
+  passwordHash varchar [not null]
+  phoneNumber varchar
+  role UserRole [not null]
+  isActive boolean [not null, default: true]
+  createdAt timestamptz [not null]
+  updatedAt timestamptz [not null]
+
+  Note: 'Identity for all roles; 0..1 patient or physio profile.'
+}
+
+Table PatientProfile {
+  id uuid [pk]
+  userId uuid [unique, not null]
+  dateOfBirth timestamptz
+  gender varchar
+  address varchar
+  emergencyContactName varchar
+  emergencyContactPhone varchar
+  createdAt timestamptz [not null]
+  updatedAt timestamptz [not null]
+}
+
+Table Category {
+  id uuid [pk]
+  name varchar [unique, not null]
+  description varchar
+  createdAt timestamptz [not null]
+  updatedAt timestamptz [not null]
+}
+
+Table PhysiotherapistProfile {
+  id uuid [pk]
+  userId uuid [unique, not null]
+  categoryId uuid
+  bio varchar
+  education varchar
+  experienceYears int [not null, default: 0]
+  certificationUrl varchar
+  licenseNumber varchar
+  consultationFee decimal(12,2) [not null]
+  clinicAddress varchar
+  verificationStatus TherapistVerificationStatus [not null, default: 'PENDING']
+  rejectionReason varchar
+  verifiedAt timestamptz
+  onlineUntil timestamptz
+  createdAt timestamptz [not null]
+  updatedAt timestamptz [not null]
+
+  Note: 'onlineUntil = heartbeat presence for browse + FAST_ONLINE SLA at create.'
+}
+
+Table AvailabilitySlot {
+  id uuid [pk]
+  physiotherapistId uuid [not null]
+  slotDate timestamptz [not null]
+  startTime timestamptz [not null]
+  endTime timestamptz [not null]
+  isAvailable boolean [not null, default: true]
+  createdAt timestamptz [not null]
+  updatedAt timestamptz [not null]
+}
+
+Table Consultation {
+  id uuid [pk]
+  patientId uuid [not null]
+  physiotherapistId uuid [not null]
+  complaint text [not null]
+  status ConsultationStatus [not null, default: 'REQUESTED']
+  feeSnapshot decimal(12,2) [not null]
+  slaTier ConsultationSlaTier [not null, default: 'STANDARD']
+  acceptedAt timestamptz
+  startedAt timestamptz
+  completedAt timestamptz
+  createdAt timestamptz [not null]
+  updatedAt timestamptz [not null]
+
+  Note: 'IN_PROGRESS after admin marks transaction PAID; SLA cron refunds if no therapist message.'
+}
+
+Table Conversation {
+  id uuid [pk]
+  consultationId uuid [unique]
+  createdAt timestamptz [not null]
+  updatedAt timestamptz [not null]
+}
+
+Table ConversationParticipant {
+  id uuid [pk]
+  conversationId uuid [not null]
+  userId uuid [not null]
+  joinedAt timestamptz [not null]
+
+  Note: 'UNIQUE (conversationId, userId)'
+}
+
+Table Message {
+  id uuid [pk]
+  conversationId uuid [not null]
+  senderId uuid [not null]
+  content text [not null]
+  createdAt timestamptz [not null]
+}
+
+Table Booking {
+  id uuid [pk]
+  consultationId uuid
+  patientId uuid [not null]
+  physiotherapistId uuid [not null]
+  slotId uuid
+  appointmentType AppointmentType [not null]
+  appointmentDate timestamptz [not null]
+  clinicAddress varchar
+  homeVisitAddress varchar
+  notes varchar
+  status BookingStatus [not null, default: 'PENDING']
+  createdAt timestamptz [not null]
+  updatedAt timestamptz [not null]
+}
+
+Table Transaction {
+  id uuid [pk]
+  bookingId uuid
+  consultationId uuid
+  patientId uuid [not null]
+  amount decimal(12,2) [not null]
+  paymentMethod PaymentMethod [not null]
+  status TransactionStatus [not null, default: 'PENDING']
+  paidAt timestamptz
+  refundedAt timestamptz
+  refundReason varchar
+  createdAt timestamptz [not null]
+  updatedAt timestamptz [not null]
+
+  Note: 'Exactly one of bookingId or consultationId must be non-null (app-enforced XOR).'
+}
+
+Table Review {
+  id uuid [pk]
+  bookingId uuid [not null]
+  patientId uuid [not null]
+  physiotherapistId uuid [not null]
+  rating int [not null]
+  comment varchar
+  isHidden boolean [not null, default: false]
+  moderationNote varchar
+  createdAt timestamptz [not null]
+  updatedAt timestamptz [not null]
+
+  Note: 'UNIQUE (bookingId, patientId)'
+}
+
+Table Notification {
+  id uuid [pk]
+  userId uuid [not null]
+  title varchar [not null]
+  body text [not null]
+  isRead boolean [not null, default: false]
+  createdAt timestamptz [not null]
+  updatedAt timestamptz [not null]
+}
+
+// --- Relationships (arrow: many → one) ---
+
+Ref: User.id - PatientProfile.userId [delete: cascade]
+Ref: User.id - PhysiotherapistProfile.userId [delete: cascade]
+Ref: Category.id - PhysiotherapistProfile.categoryId [delete: set null]
+
+Ref: PhysiotherapistProfile.id < AvailabilitySlot.physiotherapistId [delete: cascade]
+
+Ref: PatientProfile.id < Consultation.patientId [delete: cascade]
+Ref: PhysiotherapistProfile.id < Consultation.physiotherapistId [delete: cascade]
+
+Ref: Consultation.id - Conversation.consultationId [delete: set null]
+
+Ref: Conversation.id < ConversationParticipant.conversationId [delete: cascade]
+Ref: User.id < ConversationParticipant.userId [delete: cascade]
+
+Ref: Conversation.id < Message.conversationId [delete: cascade]
+Ref: User.id < Message.senderId [delete: cascade]
+
+Ref: Consultation.id < Booking.consultationId [delete: set null]
+Ref: PatientProfile.id < Booking.patientId [delete: cascade]
+Ref: PhysiotherapistProfile.id < Booking.physiotherapistId [delete: cascade]
+Ref: AvailabilitySlot.id < Booking.slotId [delete: set null]
+
+Ref: Booking.id < Transaction.bookingId [delete: cascade]
+Ref: Consultation.id < Transaction.consultationId [delete: cascade]
+Ref: PatientProfile.id < Transaction.patientId [delete: cascade]
+
+Ref: Booking.id < Review.bookingId [delete: cascade]
+Ref: PatientProfile.id < Review.patientId [delete: cascade]
+Ref: PhysiotherapistProfile.id < Review.physiotherapistId [delete: cascade]
+
+Ref: User.id < Notification.userId [delete: cascade]
