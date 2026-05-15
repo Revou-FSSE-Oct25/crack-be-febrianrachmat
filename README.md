@@ -7,6 +7,8 @@ Built with **NestJS + Prisma + PostgreSQL**, three roles (`ADMIN`, `PATIENT`, `P
 
 > Full technical documentation lives under [`docs/`](./docs/README.md).
 > If you are reviewing this project, start there.
+>
+> **Product & demo policy (Bahasa Indonesia):** [`docs/product-policy.md`](./docs/product-policy.md) — alur pembayaran, bukti bayar, privasi ringkas, disclaimer medis, dan batasan demo.
 
 ## Live API (Railway production)
 
@@ -122,6 +124,7 @@ Biasanya `dist/main.js` tidak ada karena **build TypeScript tidak pernah jalan**
 
 | Category | Where |
 |---|---|
+| **Product & demo policy** | [`docs/product-policy.md`](./docs/product-policy.md) |
 | Foundation (NestJS, Prisma, response shape, Swagger, **ERD / DBML**) | [`docs/01..04`](./docs/README.md#0x-foundation) |
 | Per-feature API + business rules | [`docs/10..19`](./docs/README.md#1x-features) |
 | Hardening + testing | [`docs/30..31`](./docs/README.md#3x-quality) |

@@ -14,6 +14,16 @@ All technical writeups previously scattered at the repo root now live here, grou
 
 ---
 
+## Produk & kebijakan (demo)
+
+Ringkasan non-teknis untuk pengguna, reviewer, dan asesmen — melengkapi file fitur `1x` di bawah.
+
+| File | Topic |
+|---|---|
+| [`product-policy.md`](./product-policy.md) | Alur peran, booking & konsultasi, pembayaran dummy & bukti, admin/refund, SLA otomatis, privasi ringkas, disclaimer medis, batasan demo. |
+
+---
+
 ## 0x. Foundation
 
 Things that apply to every feature.
