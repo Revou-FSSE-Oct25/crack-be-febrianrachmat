@@ -397,7 +397,24 @@ export class BookingsService {
     const visitFeeSnapshot = new Prisma.Decimal(therapist.visitFee.toString());
 
     const booking = await this.prisma.$transaction(async (tx) => {
-      const booking = await tx.booking.create({
+      if (dto.slotId) {
+        // Atomic claim: only one concurrent request may flip isAvailable true → false.
+        const claimed = await tx.availabilitySlot.updateMany({
+          where: {
+            id: dto.slotId,
+            physiotherapistId: dto.physiotherapistId,
+            isAvailable: true,
+          },
+          data: { isAvailable: false },
+        });
+        if (claimed.count !== 1) {
+          throw new BadRequestException(
+            'Selected slot is no longer available. Please choose another time.',
+          );
+        }
+      }
+
+      return tx.booking.create({
         data: {
           consultationId: dto.consultationId,
           patientId: patient.id,
@@ -412,15 +429,6 @@ export class BookingsService {
           status: BookingStatus.PENDING,
         },
       });
-
-      if (dto.slotId) {
-        await tx.availabilitySlot.update({
-          where: { id: dto.slotId },
-          data: { isAvailable: false },
-        });
-      }
-
-      return booking;
     });
 
     await this.safeNotify(

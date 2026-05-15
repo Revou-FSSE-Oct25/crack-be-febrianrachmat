@@ -16,7 +16,7 @@ describe('BookingsService', () => {
       findMany: jest.fn(),
       update: jest.fn(),
     },
-    availabilitySlot: { findUnique: jest.fn() },
+    availabilitySlot: { findUnique: jest.fn(), updateMany: jest.fn() },
     booking: { findUnique: jest.fn(), findMany: jest.fn() },
     transaction: {
       findUnique: jest.fn(),
@@ -123,12 +123,12 @@ describe('BookingsService', () => {
       endTime: new Date('2099-05-10T10:00:00.000Z'),
     });
     const txBookingCreate = jest.fn().mockResolvedValue({ id: 'booking-1' });
-    const txSlotUpdate = jest.fn().mockResolvedValue({ id: 'slot-1' });
+    const txSlotClaim = jest.fn().mockResolvedValue({ count: 1 });
     prismaMock.$transaction.mockImplementation(
       async (cb: (tx: any) => Promise<any>) =>
         cb({
           booking: { create: txBookingCreate },
-          availabilitySlot: { update: txSlotUpdate },
+          availabilitySlot: { updateMany: txSlotClaim },
         }),
     );
 
@@ -143,6 +143,14 @@ describe('BookingsService', () => {
       },
     );
 
+    expect(txSlotClaim).toHaveBeenCalledWith({
+      where: {
+        id: 'slot-1',
+        physiotherapistId: 'therapist-1',
+        isAvailable: true,
+      },
+      data: { isAvailable: false },
+    });
     expect(txBookingCreate).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
@@ -150,10 +158,47 @@ describe('BookingsService', () => {
         }),
       }),
     );
-    expect(txSlotUpdate).toHaveBeenCalledWith({
-      where: { id: 'slot-1' },
-      data: { isAvailable: false },
+    expect(txSlotClaim.mock.invocationCallOrder[0]).toBeLessThan(
+      txBookingCreate.mock.invocationCallOrder[0],
+    );
+  });
+
+  it('rejects slot booking when slot was claimed concurrently', async () => {
+    prismaMock.patientProfile.findUnique.mockResolvedValue({ id: 'patient-1' });
+    prismaMock.physiotherapistProfile.findUnique.mockResolvedValue({
+      id: 'therapist-1',
+      userId: 'therapist-user-1',
+      verificationStatus: 'APPROVED',
+      visitFee: 100000,
     });
+    prismaMock.availabilitySlot.findUnique.mockResolvedValue({
+      id: 'slot-1',
+      physiotherapistId: 'therapist-1',
+      isAvailable: true,
+      startTime: new Date('2026-05-10T09:00:00.000Z'),
+      endTime: new Date('2099-05-10T10:00:00.000Z'),
+    });
+    const txSlotClaim = jest.fn().mockResolvedValue({ count: 0 });
+    const txBookingCreate = jest.fn().mockResolvedValue({ id: 'booking-1' });
+    prismaMock.$transaction.mockImplementation(
+      async (cb: (tx: any) => Promise<any>) =>
+        cb({
+          booking: { create: txBookingCreate },
+          availabilitySlot: { updateMany: txSlotClaim },
+        }),
+    );
+
+    await expect(
+      service.createBooking(PATIENT_USER, {
+        physiotherapistId: 'therapist-1',
+        slotId: 'slot-1',
+        appointmentType: 'CLINIC_VISIT',
+        appointmentDate: '2026-05-10T09:00:00.000Z',
+        clinicAddress: 'Jl. Klinik Utama 123',
+      }),
+    ).rejects.toThrow(BadRequestException);
+
+    expect(txBookingCreate).not.toHaveBeenCalled();
   });
 
   it('rejects booking when appointmentDate mismatches slot startTime', async () => {
