@@ -29,7 +29,6 @@ const userPublicSelect = {
   avatarUrl: true,
   role: true,
   isActive: true,
-  emailVerifiedAt: true,
   createdAt: true,
   updatedAt: true,
 } as const;
@@ -48,26 +47,7 @@ export class UsersService {
       throw new NotFoundException('User not found.');
     }
 
-    return this.mapPublicUser(user);
-  }
-
-  private mapPublicUser(user: {
-    id: string;
-    fullName: string;
-    email: string;
-    phoneNumber: string | null;
-    avatarUrl: string | null;
-    role: UserRole;
-    isActive: boolean;
-    emailVerifiedAt: Date | null;
-    createdAt: Date;
-    updatedAt: Date;
-  }) {
-    const { emailVerifiedAt, ...rest } = user;
-    return {
-      ...rest,
-      emailVerified: Boolean(emailVerifiedAt),
-    };
+    return user;
   }
 
   async updateMyProfile(authUser: AuthUser, dto: UpdateMyProfileDto) {
@@ -80,7 +60,7 @@ export class UsersService {
       select: userPublicSelect,
     });
 
-    return this.mapPublicUser(updatedUser);
+    return updatedUser;
   }
 
   async uploadAvatar(authUser: AuthUser, uploadedPublicPath: string) {
@@ -89,7 +69,7 @@ export class UsersService {
       data: { avatarUrl: uploadedPublicPath },
       select: userPublicSelect,
     });
-    return this.mapPublicUser(updated);
+    return updated;
   }
 
   async streamMyAvatar(authUser: AuthUser, res: Response) {

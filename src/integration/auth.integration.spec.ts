@@ -4,7 +4,6 @@ import { Test } from '@nestjs/testing';
 import { UserRole } from '@prisma/client';
 import * as request from 'supertest';
 import { AppModule } from '../app.module';
-import { EmailVerifiedGuard } from '../auth/guards/email-verified.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { GlobalExceptionFilter } from '../common/filters/global-exception.filter';
@@ -70,14 +69,11 @@ describe('Core integration (real DB, no service mocks)', () => {
     );
     app.useGlobalFilters(new GlobalExceptionFilter());
     app.useGlobalInterceptors(new TransformResponseInterceptor());
-    prisma = app.get(PrismaService);
     const reflector = app.get(Reflector);
-    app.useGlobalGuards(
-      new JwtAuthGuard(reflector),
-      new EmailVerifiedGuard(reflector, prisma),
-      new RolesGuard(reflector),
-    );
+    app.useGlobalGuards(new JwtAuthGuard(reflector), new RolesGuard(reflector));
     await app.init();
+
+    prisma = app.get(PrismaService);
     await resetDatabase();
   });
 

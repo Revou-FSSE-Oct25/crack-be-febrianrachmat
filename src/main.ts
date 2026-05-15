@@ -1,4 +1,4 @@
-import { Logger, ValidationPipe } from '@nestjs/common';
+import { ValidationPipe } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
@@ -10,11 +10,8 @@ import {
   warnIfProductionJwtSecretWeak,
 } from './common/security/jwt-config';
 import { buildCorsOptions } from './common/security/cors-options';
-import { EmailVerifiedGuard } from './auth/guards/email-verified.guard';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './auth/guards/roles.guard';
-import { isSmtpConfigured } from './mail/mail.config';
-import { PrismaService } from './prisma/prisma.service';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 import { TransformResponseInterceptor } from './common/interceptors/transform-response.interceptor';
 
@@ -32,9 +29,6 @@ async function bootstrap(): Promise<void> {
     }),
   );
 
-  // Payment proofs are served only via authenticated GET /transactions/:id/payment-proof.
-
-  // Global validation keeps request payloads clean and predictable.
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -45,21 +39,8 @@ async function bootstrap(): Promise<void> {
   app.useGlobalFilters(new GlobalExceptionFilter());
   app.useGlobalInterceptors(new TransformResponseInterceptor());
 
-  // These guards are global, so every endpoint is protected by default.
-  // Public endpoints must explicitly use @Public() decorator.
   const reflector = app.get(Reflector);
-  const prisma = app.get(PrismaService);
-  app.useGlobalGuards(
-    new JwtAuthGuard(reflector),
-    new EmailVerifiedGuard(reflector, prisma),
-    new RolesGuard(reflector),
-  );
-
-  if (process.env.NODE_ENV === 'production' && !isSmtpConfigured()) {
-    Logger.warn(
-      '[bootstrap] SMTP not configured in production — email verification is disabled until SMTP_HOST and MAIL_FROM are set.',
-    );
-  }
+  app.useGlobalGuards(new JwtAuthGuard(reflector), new RolesGuard(reflector));
 
   app.enableCors(buildCorsOptions());
 
@@ -88,8 +69,6 @@ async function bootstrap(): Promise<void> {
   });
 
   const port = process.env.PORT ? Number(process.env.PORT) : 3000;
-  // Bind to 0.0.0.0 supaya container/PaaS (Railway, dll.) bisa menjangkau service
-  // dari luar; default Nest hanya listen di interface lokal.
   await app.listen(port, '0.0.0.0');
 
   // eslint-disable-next-line no-console
