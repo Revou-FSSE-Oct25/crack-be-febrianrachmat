@@ -90,6 +90,10 @@ export class PhysiotherapistsService {
         dto.consultationFee !== undefined
           ? new Prisma.Decimal(dto.consultationFee)
           : undefined,
+      visitFee:
+        dto.visitFee !== undefined
+          ? new Prisma.Decimal(dto.visitFee)
+          : undefined,
       clinicAddress: dto.clinicAddress,
       // Any profile change sends status back to pending for admin review.
       verificationStatus: TherapistVerificationStatus.PENDING,

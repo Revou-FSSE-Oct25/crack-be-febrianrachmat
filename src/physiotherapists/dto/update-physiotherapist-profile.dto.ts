@@ -48,6 +48,12 @@ export class UpdatePhysiotherapistProfileDto {
   consultationFee?: number;
 
   @IsOptional()
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  visitFee?: number;
+
+  @IsOptional()
   @IsString()
   @MinLength(10)
   clinicAddress?: string;

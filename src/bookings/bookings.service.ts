@@ -394,6 +394,8 @@ export class BookingsService {
     }
     const resolvedAppointmentDate = appointmentDate as Date;
 
+    const visitFeeSnapshot = new Prisma.Decimal(therapist.visitFee.toString());
+
     const booking = await this.prisma.$transaction(async (tx) => {
       const booking = await tx.booking.create({
         data: {
@@ -403,6 +405,7 @@ export class BookingsService {
           slotId: dto.slotId,
           appointmentType: dto.appointmentType,
           appointmentDate: resolvedAppointmentDate,
+          visitFeeSnapshot,
           clinicAddress: dto.clinicAddress,
           homeVisitAddress: dto.homeVisitAddress,
           notes: dto.notes,
@@ -579,11 +582,27 @@ export class BookingsService {
       if (!booking || booking.patientId !== patient.id) {
         throw new BadRequestException('Booking not found for current patient.');
       }
+
+      const existingBookingTx = await this.prisma.transaction.findFirst({
+        where: {
+          bookingId: booking.id,
+          status: {
+            in: [TransactionStatus.PENDING, TransactionStatus.PAID],
+          },
+        },
+      });
+      if (existingBookingTx) {
+        throw new BadRequestException(
+          'A pending or paid transaction already exists for this booking.',
+        );
+      }
+
+      const amount = new Prisma.Decimal(booking.visitFeeSnapshot.toString());
       return this.prisma.transaction.create({
         data: {
           bookingId: booking.id,
           patientId: patient.id,
-          amount: new Prisma.Decimal(dto.amount),
+          amount,
           paymentMethod: dto.paymentMethod,
           status: TransactionStatus.PENDING,
         },
@@ -622,11 +641,12 @@ export class BookingsService {
       );
     }
 
+    const amount = new Prisma.Decimal(consultation.feeSnapshot.toString());
     return this.prisma.transaction.create({
       data: {
         consultationId: consultation.id,
         patientId: patient.id,
-        amount: new Prisma.Decimal(dto.amount),
+        amount,
         paymentMethod: dto.paymentMethod,
         status: TransactionStatus.PENDING,
       },

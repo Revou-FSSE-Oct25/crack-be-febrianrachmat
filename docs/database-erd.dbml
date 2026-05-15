@@ -104,6 +104,7 @@ Table PhysiotherapistProfile {
   certificationUrl varchar
   licenseNumber varchar
   consultationFee decimal(12,2) [not null]
+  visitFee decimal(12,2) [not null, default: 0]
   clinicAddress varchar
   verificationStatus TherapistVerificationStatus [not null, default: 'PENDING']
   rejectionReason varchar
@@ -175,6 +176,7 @@ Table Booking {
   slotId uuid
   appointmentType AppointmentType [not null]
   appointmentDate timestamptz [not null]
+  visitFeeSnapshot decimal(12,2) [not null]
   clinicAddress varchar
   homeVisitAddress varchar
   notes varchar

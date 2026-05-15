@@ -113,6 +113,7 @@ describe('BookingsService', () => {
       id: 'therapist-1',
       userId: 'therapist-user-1',
       verificationStatus: 'APPROVED',
+      visitFee: 175000,
     });
     prismaMock.availabilitySlot.findUnique.mockResolvedValue({
       id: 'slot-1',
@@ -161,6 +162,7 @@ describe('BookingsService', () => {
       id: 'therapist-1',
       userId: 'therapist-user-1',
       verificationStatus: 'APPROVED',
+      visitFee: 175000,
     });
     prismaMock.availabilitySlot.findUnique.mockResolvedValue({
       id: 'slot-1',
@@ -222,6 +224,7 @@ describe('BookingsService', () => {
       id: 'therapist-1',
       userId: 'therapist-user-1',
       verificationStatus: 'APPROVED',
+      visitFee: 175000,
     });
     prismaMock.consultation.findUnique.mockResolvedValue({
       id: 'consultation-1',
@@ -250,6 +253,7 @@ describe('BookingsService', () => {
       id: 'therapist-1',
       userId: 'therapist-user-1',
       verificationStatus: 'APPROVED',
+      visitFee: 175000,
     });
     prismaMock.consultation.findUnique.mockResolvedValue({
       id: 'consultation-1',
@@ -365,14 +369,15 @@ describe('BookingsService', () => {
     prismaMock.booking.findUnique.mockResolvedValue({
       id: 'booking-1',
       patientId: 'patient-1',
+      visitFeeSnapshot: 199000,
     });
+    prismaMock.transaction.findFirst.mockResolvedValue(null);
     prismaMock.transaction.create.mockResolvedValue({ id: 'tx-1' });
 
     await service.createTransaction(
       PATIENT_USER,
       {
         bookingId: 'booking-1',
-        amount: 150000,
         paymentMethod: 'BANK_TRANSFER',
       },
     );
@@ -386,6 +391,10 @@ describe('BookingsService', () => {
         }),
       }),
     );
+    const arg = prismaMock.transaction.create.mock.calls[0][0] as {
+      data: { amount: { toString(): string } };
+    };
+    expect(arg.data.amount.toString()).toBe('199000');
   });
 
   it('creates consultation transaction once therapist has accepted', async () => {
@@ -394,13 +403,13 @@ describe('BookingsService', () => {
       id: 'consultation-1',
       patientId: 'patient-1',
       status: ConsultationStatus.ACCEPTED,
+      feeSnapshot: 150000,
     });
     prismaMock.transaction.findFirst.mockResolvedValue(null);
     prismaMock.transaction.create.mockResolvedValue({ id: 'tx-c-1' });
 
     await service.createTransaction(PATIENT_USER, {
       consultationId: 'consultation-1',
-      amount: 150000,
       paymentMethod: 'BANK_TRANSFER',
     });
 
@@ -413,6 +422,10 @@ describe('BookingsService', () => {
         }),
       }),
     );
+    const arg = prismaMock.transaction.create.mock.calls[0][0] as {
+      data: { amount: { toString(): string } };
+    };
+    expect(arg.data.amount.toString()).toBe('150000');
   });
 
   it('rejects consultation transaction before therapist accepts (status=REQUESTED)', async () => {
@@ -421,12 +434,12 @@ describe('BookingsService', () => {
       id: 'consultation-1',
       patientId: 'patient-1',
       status: ConsultationStatus.REQUESTED,
+      feeSnapshot: 150000,
     });
 
     await expect(
       service.createTransaction(PATIENT_USER, {
         consultationId: 'consultation-1',
-        amount: 150000,
         paymentMethod: 'BANK_TRANSFER',
       }),
     ).rejects.toThrow(BadRequestException);
@@ -438,6 +451,7 @@ describe('BookingsService', () => {
       id: 'consultation-1',
       patientId: 'patient-1',
       status: ConsultationStatus.ACCEPTED,
+      feeSnapshot: 150000,
     });
     prismaMock.transaction.findFirst.mockResolvedValue({
       id: 'tx-existing',
@@ -447,7 +461,6 @@ describe('BookingsService', () => {
     await expect(
       service.createTransaction(PATIENT_USER, {
         consultationId: 'consultation-1',
-        amount: 150000,
         paymentMethod: 'BANK_TRANSFER',
       }),
     ).rejects.toThrow(BadRequestException);
@@ -458,7 +471,6 @@ describe('BookingsService', () => {
 
     await expect(
       service.createTransaction(PATIENT_USER, {
-        amount: 150000,
         paymentMethod: 'BANK_TRANSFER',
       } as never),
     ).rejects.toThrow(BadRequestException);
@@ -471,7 +483,6 @@ describe('BookingsService', () => {
       service.createTransaction(PATIENT_USER, {
         bookingId: 'booking-1',
         consultationId: 'consultation-1',
-        amount: 150000,
         paymentMethod: 'BANK_TRANSFER',
       }),
     ).rejects.toThrow(BadRequestException);
@@ -482,6 +493,7 @@ describe('BookingsService', () => {
     prismaMock.booking.findUnique.mockResolvedValue({
       id: 'booking-1',
       patientId: 'patient-2',
+      visitFeeSnapshot: 100,
     });
 
     await expect(
@@ -489,7 +501,6 @@ describe('BookingsService', () => {
         PATIENT_USER,
         {
           bookingId: 'booking-1',
-          amount: 150000,
           paymentMethod: 'BANK_TRANSFER',
         },
       ),

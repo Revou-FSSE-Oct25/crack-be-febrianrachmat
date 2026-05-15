@@ -265,6 +265,8 @@ describe('Core integration (real DB, no service mocks)', () => {
       data: {
         verificationStatus: 'APPROVED',
         verifiedAt: new Date(),
+        consultationFee: 250000,
+        visitFee: 250000,
       },
     });
 
@@ -285,7 +287,6 @@ describe('Core integration (real DB, no service mocks)', () => {
       .set('Authorization', `Bearer ${patientToken}`)
       .send({
         bookingId,
-        amount: 250000,
         paymentMethod: 'BANK_TRANSFER',
       })
       .expect(201);
@@ -363,6 +364,8 @@ describe('Core integration (real DB, no service mocks)', () => {
       data: {
         verificationStatus: 'APPROVED',
         verifiedAt: new Date(),
+        consultationFee: 150000,
+        visitFee: 300000,
       },
     });
 
@@ -400,7 +403,6 @@ describe('Core integration (real DB, no service mocks)', () => {
       .set('Authorization', `Bearer ${patientToken}`)
       .send({
         consultationId,
-        amount: 150000,
         paymentMethod: 'BANK_TRANSFER',
       })
       .expect(201);
@@ -460,7 +462,6 @@ describe('Core integration (real DB, no service mocks)', () => {
       .set('Authorization', `Bearer ${patientToken}`)
       .send({
         bookingId: booking.id,
-        amount: 300000,
         paymentMethod: 'BANK_TRANSFER',
       })
       .expect(201);
@@ -657,6 +658,8 @@ describe('Core integration (real DB, no service mocks)', () => {
       data: {
         verificationStatus: 'APPROVED',
         verifiedAt: new Date(),
+        consultationFee: 100000,
+        visitFee: 100000,
       },
     });
 
@@ -677,7 +680,6 @@ describe('Core integration (real DB, no service mocks)', () => {
       .set('Authorization', `Bearer ${patientToken}`)
       .send({
         bookingId,
-        amount: 100000,
         paymentMethod: 'BANK_TRANSFER',
       })
       .expect(201);
@@ -1110,6 +1112,8 @@ describe('Core integration (real DB, no service mocks)', () => {
         data: {
           verificationStatus: 'APPROVED',
           verifiedAt: new Date(),
+          visitFee: 150000,
+          consultationFee: 150000,
         },
       });
 
@@ -1130,7 +1134,6 @@ describe('Core integration (real DB, no service mocks)', () => {
         .set('Authorization', `Bearer ${patientAToken}`)
         .send({
           bookingId,
-          amount: 150000,
           paymentMethod: 'BANK_TRANSFER',
         })
         .expect(400);

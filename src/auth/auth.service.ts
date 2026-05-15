@@ -59,8 +59,9 @@ export class AuthService {
           dto.role === UserRole.PHYSIOTHERAPIST
             ? {
                 create: {
-                  // Default fee for new therapist; will be updated in profile flow.
+                  // Default fees for new therapist; updated in profile flow.
                   consultationFee: 0,
+                  visitFee: 0,
                 },
               }
             : undefined,
