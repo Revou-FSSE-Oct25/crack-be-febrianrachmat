@@ -5,6 +5,11 @@
 Production-style backend for a physiotherapy booking platform inspired by Halodoc.
 Built with **NestJS + Prisma + PostgreSQL**, three roles (`ADMIN`, `PATIENT`, `PHYSIOTHERAPIST`), JWT auth, RBAC, REST chat, in-app notifications, and a dummy payment lifecycle.
 
+| | |
+| --- | --- |
+| **Frontend (Next.js)** | [crack-fe-febrianrachmat](https://github.com/Revou-FSSE-Oct25/crack-fe-febrianrachmat) — produksi: https://crack-fe-febrianrachmat-production.up.railway.app |
+| **Backend (repo ini)** | [crack-be-febrianrachmat](https://github.com/Revou-FSSE-Oct25/crack-be-febrianrachmat) |
+
 > Full technical documentation lives under [`docs/`](./docs/README.md).
 > If you are reviewing this project, start there.
 >
@@ -28,6 +33,8 @@ Use the **Swagger** link to browse every endpoint, try requests, and authorize w
 - **Runtime**: Node.js (TypeScript) + NestJS 11
 - **ORM**: Prisma 6 → PostgreSQL
 - **Auth**: JWT (Passport) + role-based guards (`@Roles()` + `RolesGuard`)
+- **OAuth** (opsional): Google, GitHub, Facebook, Apple — redirect ke frontend `/auth/callback` dengan `accessToken`
+- **Notifikasi**: in-app CRUD + otomasi dari booking/konsultasi/review; **email mock** (log konsol, bukan SMTP)
 - **Validation**: `class-validator` + `class-transformer` + global `ValidationPipe`
 - **Docs**: Swagger / OpenAPI at `GET /docs`
 - **Testing**: Jest unit + controller delegation + e2e-lite + real integration suite
@@ -39,7 +46,7 @@ Use the **Swagger** link to browse every endpoint, try requests, and authorize w
 crack-be-febrianrachmat/
 ├── docs/                  # Full project documentation (start here)
 ├── prisma/                # schema.prisma, migrations, seed.ts
-├── src/                   # NestJS modules (auth, users, bookings, ...)
+├── src/                   # NestJS modules (auth/oauth, users, bookings, notifications, ...)
 ├── .githooks/             # Optional local hook to keep commits author-only
 ├── package.json
 ├── prisma.config.ts
@@ -57,6 +64,7 @@ crack-be-febrianrachmat/
    ```bash
    cp .env.example .env
    # set DATABASE_URL, JWT_SECRET, PORT
+   # opsional: FRONTEND_URL, CORS_ORIGINS, OAuth provider keys (lihat .env.example)
    ```
 3. Apply schema and seed demo data:
    ```bash
@@ -82,6 +90,31 @@ Default password (overridable with `SEED_DEFAULT_PASSWORD`): `password123`
 | `patient2@demo.local` | PATIENT |
 | `physio1@demo.local` | PHYSIOTHERAPIST (APPROVED) |
 | `physio2@demo.local` | PHYSIOTHERAPIST (APPROVED) |
+| `physio3@demo.local` | PHYSIOTHERAPIST (PENDING — untuk uji verifikasi admin) |
+
+Login OAuth membuat atau menautkan akun terpisah dari akun seed di atas.
+
+## Environment (ringkasan)
+
+Salin `.env.example` → `.env`. Variabel penting:
+
+| Variabel | Keterangan |
+| --- | --- |
+| `DATABASE_URL` | PostgreSQL |
+| `JWT_SECRET` | Signing JWT — **harus sama** dengan `JWT_SECRET` di frontend (untuk gate `/admin`) |
+| `PORT` | Port HTTP (default `3000`) |
+| `CORS_ORIGINS` / `FRONTEND_URL` | Wajib di produksi; origin frontend (pisah koma untuk beberapa URL) |
+| `API_PUBLIC_URL` | Base URL publik API (callback OAuth), mis. URL Railway backend |
+| `GOOGLE_*`, `GITHUB_*`, `FACEBOOK_*`, `APPLE_*` | Opsional — hanya provider yang di-set yang aktif (`GET /auth/oauth/providers`) |
+| `EMAIL_MOCK_ENABLED` | Log email notifikasi ke konsol (`true`/`false`; default aktif kecuali `NODE_ENV=production`) |
+
+## Fitur API (ringkas)
+
+| Area | Endpoint utama |
+| --- | --- |
+| Auth | `POST /auth/register`, `POST /auth/login`, `GET /auth/me`, OAuth `GET /auth/oauth/:provider` |
+| Notifikasi | `GET /notifications/me`, `GET /notifications/me/unread-count`, `PATCH .../read`, admin broadcast |
+| Booking / konsultasi / bayar | Lihat Swagger `/docs` dan [`docs/15-booking-transaction-feature.md`](./docs/15-booking-transaction-feature.md) |
 
 ## Testing
 
@@ -105,6 +138,10 @@ The deployed API for this repository is reachable at the URLs in [Live API (Rail
    - `DATABASE_URL` → Postgres connection string from the linked DB.
    - `JWT_SECRET` → strong random secret (do **not** reuse the example).
    - `PORT` → Railway provides this; the app listens on `process.env.PORT`.
+   - `CORS_ORIGINS` → URL frontend Railway (sama dengan yang dipakai browser).
+   - `FRONTEND_URL` → URL frontend (redirect OAuth ke `/auth/callback`).
+   - `API_PUBLIC_URL` → URL publik service backend ini (untuk callback provider OAuth).
+   - Provider OAuth + `EMAIL_MOCK_ENABLED` sesuai kebutuhan (lihat `.env.example`).
 3. Build/start commands (also set in-repo via [`railway.json`](./railway.json) so Railway always runs compile + correct start):
    - **Build**: `npm run build`
    - **Start**: `npm run start:prod`
