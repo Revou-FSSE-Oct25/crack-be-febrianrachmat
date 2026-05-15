@@ -2,6 +2,10 @@
 
 This document explains the Prisma data model for your physiotherapy booking platform.
 
+**Source of truth:** [`../prisma/schema.prisma`](../prisma/schema.prisma)  
+**Machine-readable ERD:** [`database-erd.dbml`](./database-erd.dbml)  
+**Last aligned with Prisma:** 2026-05-15 (audit only — no schema migration in this step)
+
 ## Why this schema matters
 
 - It separates **authentication/identity** (`User`) from domain data (bookings, consultations, transactions).
@@ -26,10 +30,12 @@ This document explains the Prisma data model for your physiotherapy booking plat
 ### 3) PhysiotherapistProfile
 - Stores therapist-specific data (license, experience, verification status, etc.).
 - Belongs to exactly one `User`.
-- Connected to one `Category` (specialization).
-- Has many schedules, consultations, bookings, and reviews.
+- Connected to one optional `Category` (specialization).
+- Has many availability slots, consultations, bookings, and reviews.
+- `verificationStatus`: `PENDING` → admin `APPROVED` or `REJECTED` (with `rejectionReason`, `verifiedAt`).
+- `consultationFee` / `visitFee`: current list prices; copied to snapshots on consultation/booking create.
 - `onlineUntil` (nullable): bumped by dashboard heartbeat; when in the future,
-  the therapist counts as "online now" for browse filters.
+  the therapist counts as "online now" for browse filters and `FAST_ONLINE` SLA gate.
 
 ### 4) Category
 - Master data for therapist specialization (for example: sports injury, post-surgery).
@@ -61,20 +67,21 @@ This document explains the Prisma data model for your physiotherapy booking plat
   `IN_PROGRESS` (admin moderation bypasses this).
 
 ### 8) Booking
-- Appointment record for an in-person visit (home or clinic).
-- Links patient + therapist (+ optional consultation, optional slot).
-- Status lifecycle supports operational flow and cancellation.
+- Appointment record for an in-person visit (`HOME_VISIT` or `CLINIC_VISIT`).
+- Links `patientId` + `physiotherapistId` (+ optional `consultationId`, optional `slotId`).
+- `visitFeeSnapshot`: frozen from `PhysiotherapistProfile.visitFee` at creation.
+- Status lifecycle: `PENDING` → `CONFIRMED` → `IN_PROGRESS` → `COMPLETED`, or `CANCELLED`.
+- Address fields: `clinicAddress` / `homeVisitAddress` validated in API by appointment type.
 
 ### 9) Transaction
 - Dummy payment model. Linked to **either** a `Booking` OR a `Consultation`
-  via the nullable `bookingId` / `consultationId` foreign keys (XOR rule
-  enforced at the service layer).
-- Status lifecycle: `PENDING`, `PAID`, `REFUNDED`, `FAILED`.
-- When a consultation transaction is marked `PAID`, the consultation is
-  auto-promoted from `ACCEPTED` to `IN_PROGRESS`.
-- When a consultation transaction is refunded, the consultation is
-  auto-`CANCELLED`.
-- Supports admin refund simulation.
+  via nullable `bookingId` / `consultationId` (XOR enforced in the service layer).
+- `patientId` always set (patient who pays); enables `/transactions` lists without joining through booking/consultation.
+- `paymentProofUrl`: HTTPS URL or uploaded file path; required before admin confirms `PENDING` → `PAID`.
+- Status lifecycle: `PENDING`, `PAID`, `REFUNDED`, `FAILED` (there is **no** `CANCELLED` on transactions).
+- When a consultation transaction is marked `PAID`, consultation auto-promotes `ACCEPTED` → `IN_PROGRESS`.
+- When a consultation transaction is refunded, consultation auto-`CANCELLED`.
+- Supports admin refund simulation (`refundReason` min length in API).
 
 ### 10) Review
 - Patient feedback for completed sessions.
@@ -82,7 +89,36 @@ This document explains the Prisma data model for your physiotherapy booking plat
 
 ### 11) Notification
 - Simple in-app notifications.
-- Linked to user and marks read/unread state.
+- Linked to `User` and marks read/unread state.
+
+## Status enums (quick reference)
+
+| Enum | Values | Used on |
+|------|--------|---------|
+| `UserRole` | `ADMIN`, `PATIENT`, `PHYSIOTHERAPIST` | `User.role` |
+| `TherapistVerificationStatus` | `PENDING`, `APPROVED`, `REJECTED` | `PhysiotherapistProfile` |
+| `ConsultationStatus` | `REQUESTED`, `ACCEPTED`, `IN_PROGRESS`, `COMPLETED`, `CANCELLED` | `Consultation` |
+| `ConsultationSlaTier` | `STANDARD`, `FAST_ONLINE` | `Consultation` |
+| `AppointmentType` | `HOME_VISIT`, `CLINIC_VISIT` | `Booking` |
+| `BookingStatus` | `PENDING`, `CONFIRMED`, `IN_PROGRESS`, `COMPLETED`, `CANCELLED` | `Booking` |
+| `TransactionStatus` | `PENDING`, `PAID`, `REFUNDED`, `FAILED` | `Transaction` |
+| `PaymentMethod` | `BANK_TRANSFER`, `E_WALLET`, `CREDIT_CARD`, `QRIS` | `Transaction` |
+
+## Indexes (Prisma `@@index`)
+
+| Model | Index fields | Typical query |
+|-------|----------------|---------------|
+| `PhysiotherapistProfile` | `verificationStatus`, `onlineUntil` | Browse approved + online therapists |
+| `AvailabilitySlot` | `physiotherapistId`, `slotDate` | List slots per therapist/day |
+| `Consultation` | `patientId`, `physiotherapistId`, `status` | My consultations / therapist inbox |
+| `Consultation` | `status`, `startedAt` | SLA cron scan (`IN_PROGRESS`) |
+| `ConversationParticipant` | `conversationId`, `userId` (unique); `userId` | Membership / my conversations |
+| `Message` | `conversationId`, `createdAt` | Chat history pagination |
+| `Booking` | `patientId`, `physiotherapistId`, `status` | My bookings |
+| `Booking` | `appointmentDate` | Calendar / upcoming visits |
+| `Transaction` | `bookingId`, `status` / `consultationId`, `status` | Pay/refund by parent |
+| `Review` | `bookingId`, `patientId` (unique); `physiotherapistId`, `rating` | One review per booking; therapist stats |
+| `Notification` | `userId`, `isRead` | Unread count |
 
 ## Entity relationship diagram (ERD)
 
@@ -91,9 +127,14 @@ This document explains the Prisma data model for your physiotherapy booking plat
 **Live ERD (visual, zoomable, export PNG/PDF):**  
 [https://dbdiagram.io/d/Crack-Physio-6a05b6997a923b9472b2f884](https://dbdiagram.io/d/Crack-Physio-6a05b6997a923b9472b2f884)
 
-Use this link for rubric / mentor review. Keep the diagram in sync when you
-change [`../prisma/schema.prisma`](../prisma/schema.prisma) (e.g. new enums,
-`Consultation.slaTier`, indexes).
+Use this link for rubric / mentor review.
+
+**Maintenance checklist** when `schema.prisma` changes:
+
+1. Update [`database-erd.dbml`](./database-erd.dbml) (enums, columns, indexes, `Ref` onDelete).
+2. Update this file (entity descriptions, enum table, Mermaid if relationships change).
+3. Re-import DBML into [dbdiagram.io](https://dbdiagram.io) or refresh the published canvas.
+4. Run `npx prisma migrate dev` (or document manual migration) — do not edit DBML instead of Prisma.
 
 ### Machine-readable diagram (DBML in repo)
 
@@ -155,6 +196,10 @@ code, not as a single DB CHECK constraint.
 - **Unique constraints**:
   - `User.email` must be unique.
   - one profile per user (`PatientProfile.userId`, `PhysiotherapistProfile.userId`).
-  - one review per patient-booking pair.
+  - `Conversation.consultationId` unique when linked (0..1 consultation per conversation).
+  - `ConversationParticipant` (`conversationId`, `userId`) unique pair.
+  - one review per patient-booking pair (`Review.bookingId`, `patientId`).
+- **Snapshot columns** (`feeSnapshot`, `visitFeeSnapshot`): protect pricing after therapist profile edits.
+- **XOR `Transaction`**: not a DB CHECK constraint; validated in `BookingsService` / transaction create paths.
 
-_Source of truth for columns and indexes: `prisma/schema.prisma`._
+_Audit note (2026-05-15): DBML and this doc match `prisma/schema.prisma`; no column or index drift found._

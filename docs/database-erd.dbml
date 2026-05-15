@@ -1,16 +1,25 @@
 // Physiotherapy platform — PostgreSQL schema (Prisma)
 // Published canvas: https://dbdiagram.io/d/Crack-Physio-6a05b6997a923b9472b2f884
-// Import this file at https://dbdiagram.io to edit / export PNG/PDF.
-// Keep in sync with prisma/schema.prisma (last aligned: Transaction.paymentProofUrl, indexes).
+// Import at https://dbdiagram.io to edit / export PNG/PDF.
+//
+// SOURCE OF TRUTH: ../prisma/schema.prisma
+// Last audited & aligned: 2026-05-15 (Phase A — docs/ERD sync, no migration)
 
 Project physiotherapy_booking {
   database_type: 'PostgreSQL'
   Note: '''
-    XOR: Transaction.bookingId XOR Transaction.consultationId (enforced in app).
-    visitFeeSnapshot on Booking; feeSnapshot + slaTier on Consultation; paymentProofUrl on Transaction.
-    Consultation SLA cron may auto-refund PAID tx if therapist does not reply in window (Phase 3).
+    Maintenance: after any prisma/schema.prisma change, update this DBML and
+    docs/02-database-schema.md, then re-import to dbdiagram if you use the canvas.
+
+    Business rules (app layer):
+    - Transaction XOR: exactly one of bookingId / consultationId is non-null.
+    - Consultation chat unlock: status IN_PROGRESS only after admin marks tx PAID.
+    - paymentProofUrl required before admin PATCH .../pay on PENDING transactions.
+    - Consultation SLA cron may auto-refund PAID tx if therapist misses first reply.
   '''
 }
+
+// --- Enums (mirror prisma/schema.prisma) ---
 
 Enum UserRole {
   ADMIN
@@ -64,6 +73,8 @@ Enum PaymentMethod {
   QRIS
 }
 
+// --- Tables ---
+
 Table User {
   id uuid [pk]
   fullName varchar [not null]
@@ -75,7 +86,7 @@ Table User {
   createdAt timestamptz [not null]
   updatedAt timestamptz [not null]
 
-  Note: 'Identity for all roles; at most one patient or physio profile.'
+  Note: 'Auth identity for ADMIN | PATIENT | PHYSIOTHERAPIST. At most one patient or physio profile per user.'
 }
 
 Table PatientProfile {
@@ -88,13 +99,15 @@ Table PatientProfile {
   emergencyContactPhone varchar
   createdAt timestamptz [not null]
   updatedAt timestamptz [not null]
+
+  Note: 'Domain patient id used on Consultation, Booking, Transaction, Review — not User.id.'
 }
 
 Table Category {
   id uuid [pk]
   name varchar [unique, not null]
   description varchar
-  createdAt timestamptz [not null]
+  createdAt timestamptz [not null, default: `now()`]
   updatedAt timestamptz [not null]
 }
 
@@ -114,14 +127,14 @@ Table PhysiotherapistProfile {
   rejectionReason varchar
   verifiedAt timestamptz
   onlineUntil timestamptz
-  createdAt timestamptz [not null]
+  createdAt timestamptz [not null, default: `now()`]
   updatedAt timestamptz [not null]
 
   Indexes {
     (verificationStatus, onlineUntil)
   }
 
-  Note: 'visitFee snapshot copied to Booking.visitFeeSnapshot; onlineUntil = heartbeat for browse + FAST_ONLINE gate.'
+  Note: 'visitFee → Booking.visitFeeSnapshot; consultationFee → Consultation.feeSnapshot. onlineUntil = heartbeat browse filter + FAST_ONLINE gate.'
 }
 
 Table AvailabilitySlot {
@@ -131,7 +144,7 @@ Table AvailabilitySlot {
   startTime timestamptz [not null]
   endTime timestamptz [not null]
   isAvailable boolean [not null, default: true]
-  createdAt timestamptz [not null]
+  createdAt timestamptz [not null, default: `now()`]
   updatedAt timestamptz [not null]
 
   Indexes {
@@ -150,7 +163,7 @@ Table Consultation {
   acceptedAt timestamptz
   startedAt timestamptz
   completedAt timestamptz
-  createdAt timestamptz [not null]
+  createdAt timestamptz [not null, default: `now()`]
   updatedAt timestamptz [not null]
 
   Indexes {
@@ -158,7 +171,7 @@ Table Consultation {
     (status, startedAt)
   }
 
-  Note: 'IN_PROGRESS after admin marks related Transaction PAID; SLA job may refund if no therapist chat reply.'
+  Note: 'Lifecycle: REQUESTED → ACCEPTED → IN_PROGRESS (after tx PAID) → COMPLETED | CANCELLED. IN_PROGRESS unlocks chat.'
 }
 
 Table Conversation {
@@ -166,6 +179,8 @@ Table Conversation {
   consultationId uuid [unique]
   createdAt timestamptz [not null]
   updatedAt timestamptz [not null]
+
+  Note: 'Optional 1:1 with Consultation. consultationId unique when set.'
 }
 
 Table ConversationParticipant {
@@ -185,7 +200,7 @@ Table Message {
   conversationId uuid [not null]
   senderId uuid [not null]
   content text [not null]
-  createdAt timestamptz [not null]
+  createdAt timestamptz [not null, default: `now()`]
 
   Indexes {
     (conversationId, createdAt)
@@ -205,13 +220,15 @@ Table Booking {
   homeVisitAddress varchar
   notes varchar
   status BookingStatus [not null, default: 'PENDING']
-  createdAt timestamptz [not null]
+  createdAt timestamptz [not null, default: `now()`]
   updatedAt timestamptz [not null]
 
   Indexes {
     (patientId, physiotherapistId, status)
     (appointmentDate)
   }
+
+  Note: 'In-person visit. visitFeeSnapshot from PhysiotherapistProfile.visitFee at create. Status: PENDING → CONFIRMED → IN_PROGRESS → COMPLETED | CANCELLED.'
 }
 
 Table Transaction {
@@ -226,7 +243,7 @@ Table Transaction {
   refundedAt timestamptz
   refundReason varchar
   paymentProofUrl text
-  createdAt timestamptz [not null]
+  createdAt timestamptz [not null, default: `now()`]
   updatedAt timestamptz [not null]
 
   Indexes {
@@ -234,7 +251,7 @@ Table Transaction {
     (consultationId, status)
   }
 
-  Note: 'Exactly one of bookingId or consultationId non-null (app XOR). paymentProofUrl required before admin PAID.'
+  Note: 'XOR: exactly one of bookingId | consultationId. paymentProofUrl required before admin confirm PAID. No CANCELLED status — use REFUNDED.'
 }
 
 Table Review {
@@ -246,13 +263,15 @@ Table Review {
   comment varchar
   isHidden boolean [not null, default: false]
   moderationNote varchar
-  createdAt timestamptz [not null]
+  createdAt timestamptz [not null, default: `now()`]
   updatedAt timestamptz [not null]
 
   Indexes {
     (bookingId, patientId) [unique]
     (physiotherapistId, rating)
   }
+
+  Note: 'One review per patient per booking. Booking should be COMPLETED before patient submits.'
 }
 
 Table Notification {
@@ -261,7 +280,7 @@ Table Notification {
   title varchar [not null]
   body text [not null]
   isRead boolean [not null, default: false]
-  createdAt timestamptz [not null]
+  createdAt timestamptz [not null, default: `now()`]
   updatedAt timestamptz [not null]
 
   Indexes {
@@ -269,7 +288,7 @@ Table Notification {
   }
 }
 
-// --- Relationships (dbdiagram: many → one) ---
+// --- Relationships (onDelete mirrors Prisma) ---
 
 Ref: User.id - PatientProfile.userId [delete: cascade]
 Ref: User.id - PhysiotherapistProfile.userId [delete: cascade]
