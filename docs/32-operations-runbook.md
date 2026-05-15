@@ -70,11 +70,12 @@ npm run prisma:seed
 | Perintah | Lingkungan | Catatan |
 |----------|------------|---------|
 | `npm test` | Unit + e2e-lite | Tidak butuh DB; mengabaikan `*.integration.spec.ts`. |
+| `npm run test:cov` | Unit + e2e-lite + coverage | Output `coverage/`; ringkasan: `node scripts/print-coverage-summary.mjs`. |
 | `npm run test:integration` | Postgres nyata | Set `TEST_DATABASE_URL`; jalan serial (`--runInBand`). |
 | `npm run test:all` | Keduanya | Unit lalu integrasi. |
 | `npm run build` | TypeScript compile | Wajib sukses sebelum deploy. |
 
-**GitHub Actions** (`.github/workflows/ci.yml`): `npm ci` → `prisma generate` → `npm test` → `npm run build` pada setiap push/PR ke `main`. Integrasi DB **tidak** dijalankan di CI (butuh Postgres service); jalankan `test:integration` lokal sebelum submit besar.
+**GitHub Actions** (`.github/workflows/ci.yml`): `npm ci` → `prisma generate` → `npm run test:cov` → ringkasan coverage di job summary + artefak `coverage-report` → `npm run build` pada setiap push/PR ke `main`. Integrasi DB **tidak** dijalankan di CI (butuh Postgres service); jalankan `test:integration` lokal sebelum submit besar.
 
 Env CI: `DISABLE_THROTTLE=true`, `CONSULTATION_SLA_CRON=false`, placeholder `DATABASE_URL`.
 
@@ -116,7 +117,7 @@ Detail kebijakan produk: [`product-policy.md`](./product-policy.md).
 
 - Set `NEXT_PUBLIC_API_URL` ke base URL API (bukan connection string Postgres).
 - `JWT_SECRET` harus **sama** dengan backend (verifikasi token di middleware).
-- CI frontend: `npm run lint` + `npm run build` (lihat repo `crack-fe-febrianrachmat`).
+- CI frontend: `npm run lint` + `npm run build` (lihat repo `crack-fe-febrianrachmat`). Belum ada unit test / coverage di FE.
 - Cek koneksi API: `GET {NEXT_PUBLIC_API_URL}/health` atau route Next.js `/api/health` (proxy ringan).
 
 ---

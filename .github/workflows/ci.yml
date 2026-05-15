@@ -29,8 +29,22 @@ jobs:
       - name: Prisma generate
         run: npx prisma generate
 
-      - name: Unit tests
-        run: npm test
+      - name: Unit tests with coverage
+        run: npm run test:cov
+
+      - name: Publish coverage summary
+        if: success() || failure()
+        run: node scripts/print-coverage-summary.mjs
+
+      - name: Upload coverage report
+        if: success() || failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: |
+            coverage/lcov.info
+            coverage/coverage-summary.json
+          retention-days: 14
 
       - name: Build
         run: npm run build

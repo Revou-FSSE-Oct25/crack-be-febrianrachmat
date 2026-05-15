@@ -7,7 +7,12 @@ module.exports = {
   transform: {
     '^.+\\.(t|j)s$': ['ts-jest', { tsconfig: 'tsconfig.json' }],
   },
-  collectCoverageFrom: ['src/**/*.(t|j)s'],
+  collectCoverageFrom: [
+    'src/**/*.(t|j)s',
+    '!src/**/*.module.ts',
+    '!src/main.ts',
+  ],
   coverageDirectory: 'coverage',
+  coverageReporters: ['text', 'text-summary', 'lcov', 'json-summary'],
   testEnvironment: 'node',
 };

@@ -88,11 +88,13 @@ Default password (overridable with `SEED_DEFAULT_PASSWORD`): `password123`
 | Command | What it runs |
 |---|---|
 | `npm test` | Unit + controller delegation + e2e-lite (mocked) |
-| `npm run test:cov` | Unit suite with coverage report |
+| `npm run test:cov` | Unit suite with coverage report (`coverage/`, HTML di `coverage/lcov-report/index.html`) |
 | `npm run test:integration` | Real integration suite against `TEST_DATABASE_URL` (no service mocks, runs serially) |
 | `npm run test:all` | `npm test` then `npm run test:integration` |
 
-For a coverage map, what each suite asserts, and the latest local results, see [`docs/31-testing-notes.md`](./docs/31-testing-notes.md).
+For a coverage map, what each suite asserts, and how CI publishes coverage summaries, see [`docs/31-testing-notes.md`](./docs/31-testing-notes.md).
+
+**CI:** setiap push/PR ke `main` menjalankan `test:cov` dan memposting tabel coverage di GitHub Actions job summary (artefak `coverage-report` untuk unduhan).
 
 ## Deployment (Railway)
 

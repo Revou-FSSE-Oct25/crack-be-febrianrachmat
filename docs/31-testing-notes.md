@@ -13,13 +13,17 @@ Quick map of automated test coverage currently available in this repository.
 - Both stages, sequentially: `npm run test:all`
 - Unit test coverage report: `npm run test:cov`
 - Seed demo data locally: `npm run prisma:seed`
-- **CI (GitHub Actions):** push/PR ke `main` menjalankan `npm test` + `npm run build` (lihat [`32-operations-runbook.md`](./32-operations-runbook.md)).
+- **CI (GitHub Actions):** push/PR ke `main` menjalankan `npm run test:cov` + `npm run build` (lihat [`32-operations-runbook.md`](./32-operations-runbook.md)).
+  - Ringkasan % coverage muncul di **job summary** GitHub Actions.
+  - Artefak `coverage-report` (`lcov.info`, `coverage-summary.json`) tersedia untuk diunduh dari run CI.
 
 ## Latest local results (example)
 
-- `npm test` (unit + e2e-lite): 14 suites, 79 tests ✅
+Jalankan ulang sebelum submit; angka di bawah hanya contoh dari suite unit/e2e-lite:
+
+- `npm test` (unit + e2e-lite): 18 suites, 102 tests ✅
 - `npm run test:integration`: 1 suite, ~22 tests against a dedicated test DB ✅ (run locally before submission)
-- `npm run test:cov` (unit/e2e-lite only): ~77% statements / ~55% branches / ~70% functions / ~76% lines on the latest local run
+- `npm run test:cov` (unit/e2e-lite only): lihat baris **All files** di terminal, atau buka `coverage/lcov-report/index.html` setelah `npm run test:cov`
 
 ## Current test coverage map
 
