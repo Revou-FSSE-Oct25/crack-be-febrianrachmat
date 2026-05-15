@@ -5,7 +5,11 @@
  */
 export function buildCorsOptions() {
   const raw = process.env.CORS_ORIGINS?.trim();
+  const isProd = process.env.NODE_ENV === 'production';
   if (!raw) {
+    if (isProd) {
+      return { origin: false, credentials: true };
+    }
     return { origin: true, credentials: true };
   }
   const origins = raw

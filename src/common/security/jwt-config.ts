@@ -27,14 +27,19 @@ export function getJwtSecret(configService: ConfigService): string {
   return secret;
 }
 
+/**
+ * Logs when production is missing CORS_ORIGINS. Does not throw so Railway
+ * healthchecks can pass; browser CORS stays locked down via `buildCorsOptions`.
+ */
 export function assertProductionCorsOrigins(): void {
   if (process.env.NODE_ENV !== 'production') {
     return;
   }
   const raw = process.env.CORS_ORIGINS?.trim();
   if (!raw) {
-    throw new Error(
-      'CORS_ORIGINS is required when NODE_ENV=production (comma-separated frontend URLs).',
+    // eslint-disable-next-line no-console
+    console.warn(
+      '[bootstrap] CORS_ORIGINS is unset in production. Set comma-separated frontend URLs (e.g. https://your-app.up.railway.app). Until then, browser cross-origin API calls are blocked.',
     );
   }
 }

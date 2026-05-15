@@ -34,6 +34,15 @@ Lihat `.env.example`. Ringkasan:
 | `NODE_ENV=production` | Produksi | Wajib `JWT_SECRET` kuat (≥32 char) dan `CORS_ORIGINS` terisi. |
 
 **Bukti bayar:** file upload hanya bisa diakses lewat `GET /transactions/:id/payment-proof` (JWT). Jangan mengandalkan URL `/uploads/...` publik.
+
+**Railway env (wajib untuk FE↔BE):**
+
+| Variable | Contoh |
+|----------|--------|
+| `CORS_ORIGINS` | URL frontend (pisah koma), mis. `https://crack-fe-febrianrachmat-production.up.railway.app` |
+| `JWT_SECRET` | Min. 32 karakter, bukan nilai default dari `.env.example` |
+
+Tanpa `CORS_ORIGINS`, deploy tetap hidup tetapi browser memblokir request lintas-origin sampai variabel di-set.
 | `RUN_DB_SEED` | Opsional | `true` sekali setelah deploy untuk memuat `prisma/seed.ts`. |
 | `SEED_DEFAULT_PASSWORD` | Opsional | Override password akun demo (default `password123`). |
 
