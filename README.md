@@ -127,7 +127,7 @@ Biasanya `dist/main.js` tidak ada karena **build TypeScript tidak pernah jalan**
 | **Product & demo policy** | [`docs/product-policy.md`](./docs/product-policy.md) |
 | Foundation (NestJS, Prisma, response shape, Swagger, **ERD / DBML**) | [`docs/01..04`](./docs/README.md#0x-foundation) |
 | Per-feature API + business rules | [`docs/10..19`](./docs/README.md#1x-features) |
-| Hardening + testing | [`docs/30..31`](./docs/README.md#3x-quality) |
+| Hardening + testing + ops | [`docs/30..32`](./docs/README.md#3x-quality) |
 
 ## Conventions
 

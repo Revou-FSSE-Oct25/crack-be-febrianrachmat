@@ -8,7 +8,7 @@ All technical writeups previously scattered at the repo root now live here, grou
 - File names start with a 2-digit prefix so they sort logically:
   - `0x` — Foundation (architecture, runtime, contracts)
   - `1x` — Feature documentation (one file per domain module)
-  - `3x` — Quality (hardening, testing notes)
+  - `3x` — Quality (hardening, testing, operations)
 - Open files in numeric order if you are new to the project.
 - Open files by category if you are looking up a specific topic.
 
@@ -60,6 +60,7 @@ How the API is hardened and tested.
 |---|---|
 | [`30-hardening-testing-baseline.md`](./30-hardening-testing-baseline.md) | Global exception filter, health resilience, pagination DTO, first unit tests. |
 | [`31-testing-notes.md`](./31-testing-notes.md) | Full automated-test coverage map (unit + controller + e2e-lite + real integration) and how to run them. |
+| [`32-operations-runbook.md`](./32-operations-runbook.md) | Health checks, env vars, Railway deploy, CI, troubleshooting, demo checklist. |
 
 ---
 
@@ -70,3 +71,4 @@ How the API is hardened and tested.
 - **Published ERD (dbdiagram.io):** [https://dbdiagram.io/d/Crack-Physio-6a05b6997a923b9472b2f884](https://dbdiagram.io/d/Crack-Physio-6a05b6997a923b9472b2f884) — source DBML: [`database-erd.dbml`](./database-erd.dbml).
 - **Understand the data model**: see `02-database-schema.md`.
 - **Run tests / check coverage**: see `31-testing-notes.md`.
+- **Deploy, monitor, troubleshoot**: see `32-operations-runbook.md`.
