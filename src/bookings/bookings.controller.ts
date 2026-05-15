@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   Body,
   Controller,
   Get,
@@ -28,6 +27,7 @@ import { UpdateBookingStatusDto } from './dto/update-booking-status.dto';
 import { UpdateConsultationStatusDto } from './dto/update-consultation-status.dto';
 import {
   paymentProofDiskStorage,
+  paymentProofFileFilter,
   paymentProofUploadLimits,
 } from './payment-proof-upload';
 
@@ -107,6 +107,7 @@ export class BookingsController {
     FileInterceptor('proof', {
       storage: paymentProofDiskStorage(),
       limits: paymentProofUploadLimits,
+      fileFilter: paymentProofFileFilter,
     }),
   )
   @ApiOperation({
@@ -120,11 +121,6 @@ export class BookingsController {
   ) {
     let uploadedPublicPath: string | undefined;
     if (proof) {
-      if (!proof.mimetype?.startsWith('image/')) {
-        throw new BadRequestException(
-          'Bukti bayar harus berupa gambar (mis. JPEG, PNG, WebP).',
-        );
-      }
       uploadedPublicPath = `/uploads/payment-proofs/${proof.filename}`;
     }
     return this.bookingsService.createTransaction(
@@ -139,18 +135,26 @@ export class BookingsController {
   @ApiOperation({
     summary: 'Confirm pending transaction as paid (admin / system dummy)',
   })
-  markPaidByAdmin(@Param('transactionId') transactionId: string) {
-    return this.bookingsService.markTransactionPaidByAdmin(transactionId);
+  markPaidByAdmin(@Req() req: Request, @Param('transactionId') transactionId: string) {
+    return this.bookingsService.markTransactionPaidByAdmin(
+      transactionId,
+      req.user as AuthUser,
+    );
   }
 
   @Roles(UserRole.ADMIN)
   @Patch('admin/transactions/:transactionId/refund')
   @ApiOperation({ summary: 'Refund paid transaction (admin dummy refund)' })
   refund(
+    @Req() req: Request,
     @Param('transactionId') transactionId: string,
     @Body() dto: RefundTransactionDto,
   ) {
-    return this.bookingsService.refundTransactionByAdmin(transactionId, dto);
+    return this.bookingsService.refundTransactionByAdmin(
+      transactionId,
+      dto,
+      req.user as AuthUser,
+    );
   }
 
   @Roles(UserRole.ADMIN, UserRole.PATIENT)

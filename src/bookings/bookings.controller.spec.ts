@@ -21,7 +21,13 @@ describe('BookingsController', () => {
     email: 'p@mail.com',
     role: UserRole.PATIENT,
   };
+  const ADMIN_USER = {
+    sub: 'admin-user-1',
+    email: 'a@mail.com',
+    role: UserRole.ADMIN,
+  };
   const REQ = { user: PATIENT_USER };
+  const ADMIN_REQ = { user: ADMIN_USER };
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -85,11 +91,12 @@ describe('BookingsController', () => {
     const dto = { reason: 'Duplicate payment' };
     bookingsServiceMock.refundTransactionByAdmin.mockResolvedValue({ id: 'tx-1' });
 
-    await controller.refund('tx-1', dto);
+    await controller.refund(ADMIN_REQ as never, 'tx-1', dto);
 
     expect(bookingsServiceMock.refundTransactionByAdmin).toHaveBeenCalledWith(
       'tx-1',
       dto,
+      ADMIN_USER,
     );
   });
 
@@ -98,10 +105,11 @@ describe('BookingsController', () => {
       id: 'tx-1',
     });
 
-    await controller.markPaidByAdmin('tx-1');
+    await controller.markPaidByAdmin(ADMIN_REQ as never, 'tx-1');
 
     expect(bookingsServiceMock.markTransactionPaidByAdmin).toHaveBeenCalledWith(
       'tx-1',
+      ADMIN_USER,
     );
   });
 });

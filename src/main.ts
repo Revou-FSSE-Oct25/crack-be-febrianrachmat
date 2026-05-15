@@ -1,10 +1,12 @@
-import { ValidationPipe } from '@nestjs/common';
+import { Logger, ValidationPipe } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import helmet from 'helmet';
 import { join } from 'path';
 import { AppModule } from './app.module';
+import { buildCorsOptions } from './common/security/cors-options';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './auth/guards/roles.guard';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
@@ -12,6 +14,14 @@ import { TransformResponseInterceptor } from './common/interceptors/transform-re
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
+
+  app.use(
+    helmet({
+      contentSecurityPolicy: false,
+      crossOriginEmbedderPolicy: false,
+      crossOriginResourcePolicy: { policy: 'cross-origin' },
+    }),
+  );
 
   app.useStaticAssets(join(process.cwd(), 'uploads'), { prefix: '/uploads/' });
 
@@ -31,7 +41,15 @@ async function bootstrap(): Promise<void> {
   const reflector = app.get(Reflector);
   app.useGlobalGuards(new JwtAuthGuard(reflector), new RolesGuard(reflector));
 
-  app.enableCors();
+  app.enableCors(buildCorsOptions());
+  if (
+    process.env.NODE_ENV === 'production' &&
+    !process.env.CORS_ORIGINS?.trim()
+  ) {
+    new Logger('Bootstrap').warn(
+      'CORS_ORIGINS kosong — semua origin diizinkan. Set CORS_ORIGINS ke URL frontend untuk produksi.',
+    );
+  }
 
   const swaggerConfig = new DocumentBuilder()
     .setTitle('Physiotherapy Booking API')

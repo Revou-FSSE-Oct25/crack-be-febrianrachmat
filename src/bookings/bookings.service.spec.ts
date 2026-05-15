@@ -596,7 +596,7 @@ describe('BookingsService', () => {
     });
     notificationsMock.createSystemNotification.mockResolvedValue(undefined);
 
-    await service.markTransactionPaidByAdmin('tx-1');
+    await service.markTransactionPaidByAdmin('tx-1', ADMIN_USER);
 
     expect(prismaMock.transaction.update).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -637,7 +637,7 @@ describe('BookingsService', () => {
       userId: 'user-patient-1',
     });
 
-    await service.markTransactionPaidByAdmin('tx-c-1');
+    await service.markTransactionPaidByAdmin('tx-c-1', ADMIN_USER);
 
     expect(prismaMock.consultation.update).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -671,7 +671,9 @@ describe('BookingsService', () => {
       new Error('notification service down'),
     );
 
-    await expect(service.markTransactionPaidByAdmin('tx-1')).resolves.toEqual(
+    await expect(
+      service.markTransactionPaidByAdmin('tx-1', ADMIN_USER),
+    ).resolves.toEqual(
       expect.objectContaining({
         id: 'tx-1',
         status: TransactionStatus.PAID,
@@ -711,7 +713,7 @@ describe('BookingsService', () => {
     });
 
     await expect(
-      service.refundTransactionByAdmin('tx-1', { reason: 'Duplicate payment' }),
+      service.refundTransactionByAdmin('tx-1', { reason: 'Duplicate payment' }, ADMIN_USER),
     ).rejects.toThrow(BadRequestException);
   });
 
@@ -719,7 +721,7 @@ describe('BookingsService', () => {
     prismaMock.transaction.findUnique.mockResolvedValue(null);
 
     await expect(
-      service.refundTransactionByAdmin('tx-404', { reason: 'N/A' }),
+      service.refundTransactionByAdmin('tx-404', { reason: 'N/A' }, ADMIN_USER),
     ).rejects.toThrow(NotFoundException);
   });
 

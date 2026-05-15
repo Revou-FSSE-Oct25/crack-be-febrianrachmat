@@ -694,7 +694,10 @@ export class BookingsService {
    * Consultation, status consultation otomatis dipindah dari ACCEPTED →
    * IN_PROGRESS sehingga chat ter-unlock. Ini fondasi flow pay-first.
    */
-  async markTransactionPaidByAdmin(transactionId: string) {
+  async markTransactionPaidByAdmin(
+    transactionId: string,
+    actor?: AuthUser,
+  ) {
     const transaction = await this.prisma.transaction.findUnique({
       where: { id: transactionId },
       include: { consultation: { include: { physiotherapist: true } } },
@@ -756,12 +759,25 @@ export class BookingsService {
       );
     }
 
+    this.logger.log(
+      JSON.stringify({
+        type: 'audit.transaction_mark_paid',
+        transactionId,
+        adminUserId: actor?.sub ?? 'unknown',
+        patientId: transaction.patientId,
+        ...(transaction.amount != null
+          ? { amount: transaction.amount.toString() }
+          : {}),
+      }),
+    );
+
     return updated;
   }
 
   async refundTransactionByAdmin(
     transactionId: string,
     dto: RefundTransactionDto,
+    actor?: AuthUser,
   ) {
     const transaction = await this.prisma.transaction.findUnique({
       where: { id: transactionId },
@@ -826,6 +842,19 @@ export class BookingsService {
         `Transaksi konsultasi dikembalikan. Alasan: ${dto.reason}`,
       );
     }
+
+    this.logger.log(
+      JSON.stringify({
+        type: 'audit.transaction_refund',
+        transactionId,
+        adminUserId: actor?.sub ?? 'system',
+        reason: dto.reason,
+        patientId: transaction.patientId,
+        ...(transaction.amount != null
+          ? { amount: transaction.amount.toString() }
+          : {}),
+      }),
+    );
 
     return updated;
   }

@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AdminModule } from './admin/admin.module';
 import { AvailabilitySlotsModule } from './availability-slots/availability-slots.module';
 import { AuthModule } from './auth/auth.module';
@@ -18,6 +20,12 @@ import { UsersModule } from './users/users.module';
     // isGlobal=true lets us use environment variables anywhere without
     // repeatedly importing ConfigModule in every feature module.
     ConfigModule.forRoot({ isGlobal: true }),
+    ThrottlerModule.forRoot({
+      throttlers: [{ name: 'default', ttl: 60_000, limit: 120 }],
+      skipIf: () => process.env.DISABLE_THROTTLE === 'true',
+      errorMessage:
+        'Terlalu banyak permintaan dari alamat ini. Coba lagi dalam beberapa saat.',
+    }),
     PrismaModule,
     AdminModule,
     AuthModule,
@@ -30,6 +38,12 @@ import { UsersModule } from './users/users.module';
     NotificationsModule,
     ReviewsModule,
     HealthModule,
+  ],
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
   ],
 })
 export class AppModule {}
