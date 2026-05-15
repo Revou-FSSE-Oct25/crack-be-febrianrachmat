@@ -31,6 +31,9 @@ Lihat `.env.example`. Ringkasan:
 | `CORS_ORIGINS` | Produksi disarankan | Daftar origin frontend dipisah koma. Kosong = izinkan semua (dev). |
 | `DISABLE_THROTTLE` | Opsional | `true` untuk test/CI agar rate limit tidak mengganggu. |
 | `CONSULTATION_SLA_CRON` | Opsional | `false` menonaktifkan cron refund SLA otomatis (disarankan di CI/test). |
+| `NODE_ENV=production` | Produksi | Wajib `JWT_SECRET` kuat (≥32 char) dan `CORS_ORIGINS` terisi. |
+
+**Bukti bayar:** file upload hanya bisa diakses lewat `GET /transactions/:id/payment-proof` (JWT). Jangan mengandalkan URL `/uploads/...` publik.
 | `RUN_DB_SEED` | Opsional | `true` sekali setelah deploy untuk memuat `prisma/seed.ts`. |
 | `SEED_DEFAULT_PASSWORD` | Opsional | Override password akun demo (default `password123`). |
 

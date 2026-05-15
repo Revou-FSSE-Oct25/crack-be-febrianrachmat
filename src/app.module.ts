@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
+import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AdminModule } from './admin/admin.module';
 import { AvailabilitySlotsModule } from './availability-slots/availability-slots.module';
@@ -20,6 +21,7 @@ import { UsersModule } from './users/users.module';
     // isGlobal=true lets us use environment variables anywhere without
     // repeatedly importing ConfigModule in every feature module.
     ConfigModule.forRoot({ isGlobal: true }),
+    ScheduleModule.forRoot(),
     ThrottlerModule.forRoot({
       throttlers: [{ name: 'default', ttl: 60_000, limit: 120 }],
       skipIf: () => process.env.DISABLE_THROTTLE === 'true',

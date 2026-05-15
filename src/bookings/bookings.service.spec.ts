@@ -23,6 +23,7 @@ describe('BookingsService', () => {
       findFirst: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
+      updateMany: jest.fn(),
       findMany: jest.fn(),
     },
     message: { count: jest.fn() },
@@ -250,6 +251,7 @@ describe('BookingsService', () => {
         cb({
           booking: { update: txBookingUpdate },
           availabilitySlot: { update: txSlotUpdate },
+          transaction: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
         }),
     );
 
@@ -414,6 +416,7 @@ describe('BookingsService', () => {
     prismaMock.booking.findUnique.mockResolvedValue({
       id: 'booking-1',
       patientId: 'patient-1',
+      status: BookingStatus.CONFIRMED,
       visitFeeSnapshot: 199000,
     });
     prismaMock.transaction.findFirst.mockResolvedValue(null);
@@ -564,6 +567,7 @@ describe('BookingsService', () => {
     prismaMock.booking.findUnique.mockResolvedValue({
       id: 'booking-1',
       patientId: 'patient-1',
+      status: BookingStatus.CONFIRMED,
       visitFeeSnapshot: 100,
     });
     prismaMock.transaction.findFirst.mockResolvedValue(null);

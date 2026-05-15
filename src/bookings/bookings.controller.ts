@@ -7,9 +7,11 @@ import {
   Post,
   Query,
   Req,
+  Res,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
 import type { Express } from 'express';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
@@ -162,5 +164,23 @@ export class BookingsController {
   @ApiOperation({ summary: 'List transactions by current actor' })
   listTransactions(@Req() req: Request, @Query() query: PaginationQueryDto) {
     return this.bookingsService.listTransactions(req.user as AuthUser, query);
+  }
+
+  @Roles(UserRole.ADMIN, UserRole.PATIENT)
+  @Get('transactions/:transactionId/payment-proof')
+  @ApiOperation({
+    summary:
+      'View payment proof (patient owner or admin). Uploaded files require auth; https URLs redirect.',
+  })
+  streamPaymentProof(
+    @Req() req: Request,
+    @Param('transactionId') transactionId: string,
+    @Res() res: Response,
+  ) {
+    return this.bookingsService.streamPaymentProof(
+      req.user as AuthUser,
+      transactionId,
+      res,
+    );
   }
 }

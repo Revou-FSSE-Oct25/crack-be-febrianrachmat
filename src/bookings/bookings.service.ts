@@ -5,6 +5,9 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
+import { createReadStream, existsSync } from 'fs';
+import { join } from 'path';
+import type { Response } from 'express';
 import { ConfigService } from '@nestjs/config';
 import {
   AppointmentType,
@@ -184,13 +187,8 @@ export class BookingsService {
       throw new NotFoundException('Consultation not found.');
     }
 
-    // IN_PROGRESS is only set automatically when admin confirms a paid
-    // transaction. Disallow setting it through this generic endpoint to
-    // prevent bypassing the payment requirement.
-    if (
-      dto.status === ConsultationStatus.IN_PROGRESS &&
-      authUser.role !== UserRole.ADMIN
-    ) {
+    // IN_PROGRESS is only set when admin confirms a paid transaction.
+    if (dto.status === ConsultationStatus.IN_PROGRESS) {
       throw new BadRequestException(
         'IN_PROGRESS is set automatically once the transaction is paid; not assignable manually.',
       );
@@ -245,19 +243,31 @@ export class BookingsService {
       throw new ForbiddenException('Unauthorized role.');
     }
 
-    const updated = await this.prisma.consultation.update({
-      where: { id: consultationId },
-      data: {
-        status: dto.status,
-        acceptedAt:
-          dto.status === ConsultationStatus.ACCEPTED && !consultation.acceptedAt
-            ? new Date()
-            : undefined,
-        completedAt:
-          dto.status === ConsultationStatus.COMPLETED
-            ? new Date()
-            : undefined,
-      },
+    const updated = await this.prisma.$transaction(async (tx) => {
+      if (dto.status === ConsultationStatus.CANCELLED) {
+        await tx.transaction.updateMany({
+          where: {
+            consultationId,
+            status: TransactionStatus.PENDING,
+          },
+          data: { status: TransactionStatus.FAILED },
+        });
+      }
+
+      return tx.consultation.update({
+        where: { id: consultationId },
+        data: {
+          status: dto.status,
+          acceptedAt:
+            dto.status === ConsultationStatus.ACCEPTED && !consultation.acceptedAt
+              ? new Date()
+              : undefined,
+          completedAt:
+            dto.status === ConsultationStatus.COMPLETED
+              ? new Date()
+              : undefined,
+        },
+      });
     });
 
     if (authUser.role === UserRole.PHYSIOTHERAPIST) {
@@ -521,8 +531,22 @@ export class BookingsService {
         data: { status: dto.status },
       });
 
-      // If booking gets cancelled, release slot back to available.
-      if (dto.status === BookingStatus.CANCELLED && booking.slotId) {
+      if (dto.status === BookingStatus.CANCELLED) {
+        await tx.transaction.updateMany({
+          where: {
+            bookingId,
+            status: TransactionStatus.PENDING,
+          },
+          data: { status: TransactionStatus.FAILED },
+        });
+      }
+
+      // Release slot when booking ends (cancelled or completed).
+      if (
+        booking.slotId &&
+        (dto.status === BookingStatus.CANCELLED ||
+          dto.status === BookingStatus.COMPLETED)
+      ) {
         await tx.availabilitySlot.update({
           where: { id: booking.slotId },
           data: { isAvailable: true },
@@ -588,28 +612,6 @@ export class BookingsService {
     }
 
     if (dto.bookingId) {
-      const booking = await this.prisma.booking.findUnique({
-        where: { id: dto.bookingId },
-      });
-      if (!booking || booking.patientId !== patient.id) {
-        throw new BadRequestException('Booking not found for current patient.');
-      }
-
-      const existingBookingTx = await this.prisma.transaction.findFirst({
-        where: {
-          bookingId: booking.id,
-          status: {
-            in: [TransactionStatus.PENDING, TransactionStatus.PAID],
-          },
-        },
-      });
-      if (existingBookingTx) {
-        throw new BadRequestException(
-          'A pending or paid transaction already exists for this booking.',
-        );
-      }
-
-      const amount = new Prisma.Decimal(booking.visitFeeSnapshot.toString());
       const proof = (
         uploadedProofPublicPath?.trim() ||
         dto.paymentProofUrl?.trim() ||
@@ -620,51 +622,60 @@ export class BookingsService {
           'Lampirkan bukti pembayaran: unggah gambar (JPEG, PNG, atau WebP) atau tautan https ke bukti Anda.',
         );
       }
-      return this.prisma.transaction.create({
-        data: {
-          bookingId: booking.id,
-          patientId: patient.id,
-          amount,
-          paymentMethod: dto.paymentMethod,
-          status: TransactionStatus.PENDING,
-          paymentProofUrl: proof,
-        },
+
+      return this.prisma.$transaction(async (tx) => {
+        const booking = await tx.booking.findUnique({
+          where: { id: dto.bookingId },
+        });
+        if (!booking || booking.patientId !== patient.id) {
+          throw new BadRequestException(
+            'Booking not found for current patient.',
+          );
+        }
+        if (booking.status === BookingStatus.CANCELLED) {
+          throw new BadRequestException(
+            'Cannot pay for a cancelled booking.',
+          );
+        }
+        const payableBookingStatuses: BookingStatus[] = [
+          BookingStatus.CONFIRMED,
+          BookingStatus.IN_PROGRESS,
+          BookingStatus.COMPLETED,
+        ];
+        if (!payableBookingStatuses.includes(booking.status)) {
+          throw new BadRequestException(
+            `Booking must be CONFIRMED before payment (current: ${booking.status}).`,
+          );
+        }
+
+        const existingBookingTx = await tx.transaction.findFirst({
+          where: {
+            bookingId: booking.id,
+            status: {
+              in: [TransactionStatus.PENDING, TransactionStatus.PAID],
+            },
+          },
+        });
+        if (existingBookingTx) {
+          throw new BadRequestException(
+            'A pending or paid transaction already exists for this booking.',
+          );
+        }
+
+        const amount = new Prisma.Decimal(booking.visitFeeSnapshot.toString());
+        return tx.transaction.create({
+          data: {
+            bookingId: booking.id,
+            patientId: patient.id,
+            amount,
+            paymentMethod: dto.paymentMethod,
+            status: TransactionStatus.PENDING,
+            paymentProofUrl: proof,
+          },
+        });
       });
     }
 
-    // Consultation transaction path: only allowed once the therapist has
-    // ACCEPTED the request. This is what gates "pay-first" and ensures the
-    // patient never pays for a session the therapist never agreed to take.
-    const consultation = await this.prisma.consultation.findUnique({
-      where: { id: dto.consultationId },
-    });
-    if (!consultation || consultation.patientId !== patient.id) {
-      throw new BadRequestException(
-        'Consultation not found for current patient.',
-      );
-    }
-    if (consultation.status !== ConsultationStatus.ACCEPTED) {
-      throw new BadRequestException(
-        `Consultation must be ACCEPTED before payment (current status: ${consultation.status}).`,
-      );
-    }
-
-    // Block duplicate pending/paid transactions on the same consultation.
-    const existing = await this.prisma.transaction.findFirst({
-      where: {
-        consultationId: consultation.id,
-        status: {
-          in: [TransactionStatus.PENDING, TransactionStatus.PAID],
-        },
-      },
-    });
-    if (existing) {
-      throw new BadRequestException(
-        'A pending or paid transaction already exists for this consultation.',
-      );
-    }
-
-    const amount = new Prisma.Decimal(consultation.feeSnapshot.toString());
     const proof = (
       uploadedProofPublicPath?.trim() ||
       dto.paymentProofUrl?.trim() ||
@@ -675,15 +686,50 @@ export class BookingsService {
         'Lampirkan bukti pembayaran: unggah gambar (JPEG, PNG, atau WebP) atau tautan https ke bukti Anda.',
       );
     }
-    return this.prisma.transaction.create({
-      data: {
-        consultationId: consultation.id,
-        patientId: patient.id,
-        amount,
-        paymentMethod: dto.paymentMethod,
-        status: TransactionStatus.PENDING,
-        paymentProofUrl: proof,
-      },
+
+    return this.prisma.$transaction(async (tx) => {
+      const consultation = await tx.consultation.findUnique({
+        where: { id: dto.consultationId },
+      });
+      if (!consultation || consultation.patientId !== patient.id) {
+        throw new BadRequestException(
+          'Consultation not found for current patient.',
+        );
+      }
+      if (consultation.status === ConsultationStatus.CANCELLED) {
+        throw new BadRequestException('Cannot pay for a cancelled consultation.');
+      }
+      if (consultation.status !== ConsultationStatus.ACCEPTED) {
+        throw new BadRequestException(
+          `Consultation must be ACCEPTED before payment (current status: ${consultation.status}).`,
+        );
+      }
+
+      const existing = await tx.transaction.findFirst({
+        where: {
+          consultationId: consultation.id,
+          status: {
+            in: [TransactionStatus.PENDING, TransactionStatus.PAID],
+          },
+        },
+      });
+      if (existing) {
+        throw new BadRequestException(
+          'A pending or paid transaction already exists for this consultation.',
+        );
+      }
+
+      const amount = new Prisma.Decimal(consultation.feeSnapshot.toString());
+      return tx.transaction.create({
+        data: {
+          consultationId: consultation.id,
+          patientId: patient.id,
+          amount,
+          paymentMethod: dto.paymentMethod,
+          status: TransactionStatus.PENDING,
+          paymentProofUrl: proof,
+        },
+      });
     });
   }
 
@@ -700,7 +746,10 @@ export class BookingsService {
   ) {
     const transaction = await this.prisma.transaction.findUnique({
       where: { id: transactionId },
-      include: { consultation: { include: { physiotherapist: true } } },
+      include: {
+        consultation: { include: { physiotherapist: true } },
+        booking: true,
+      },
     });
     if (!transaction) {
       throw new NotFoundException('Transaction not found.');
@@ -714,6 +763,32 @@ export class BookingsService {
       );
     }
 
+    if (transaction.bookingId && transaction.booking) {
+      if (transaction.booking.status === BookingStatus.CANCELLED) {
+        throw new BadRequestException(
+          'Cannot confirm payment for a cancelled booking.',
+        );
+      }
+      if (transaction.booking.status === BookingStatus.PENDING) {
+        throw new BadRequestException(
+          'Booking must be CONFIRMED before payment can be approved.',
+        );
+      }
+    }
+
+    if (transaction.consultationId && transaction.consultation) {
+      if (transaction.consultation.status === ConsultationStatus.CANCELLED) {
+        throw new BadRequestException(
+          'Cannot confirm payment for a cancelled consultation.',
+        );
+      }
+      if (transaction.consultation.status !== ConsultationStatus.ACCEPTED) {
+        throw new BadRequestException(
+          `Consultation must be ACCEPTED before payment confirmation (current: ${transaction.consultation.status}).`,
+        );
+      }
+    }
+
     const now = new Date();
     const updated = await this.prisma.$transaction(async (tx) => {
       const updated = await tx.transaction.update({
@@ -722,17 +797,13 @@ export class BookingsService {
       });
 
       if (transaction.consultationId && transaction.consultation) {
-        if (
-          transaction.consultation.status === ConsultationStatus.ACCEPTED
-        ) {
-          await tx.consultation.update({
-            where: { id: transaction.consultationId },
-            data: {
-              status: ConsultationStatus.IN_PROGRESS,
-              startedAt: now,
-            },
-          });
-        }
+        await tx.consultation.update({
+          where: { id: transaction.consultationId },
+          data: {
+            status: ConsultationStatus.IN_PROGRESS,
+            startedAt: now,
+          },
+        });
       }
 
       return updated;
@@ -968,6 +1039,64 @@ export class BookingsService {
       skip,
       take,
     });
+  }
+
+  /**
+   * Stream uploaded payment proof (auth required). External https URLs redirect.
+   */
+  async streamPaymentProof(
+    authUser: AuthUser,
+    transactionId: string,
+    res: Response,
+  ): Promise<void> {
+    const transaction = await this.prisma.transaction.findUnique({
+      where: { id: transactionId },
+      include: { patient: true },
+    });
+    if (!transaction) {
+      throw new NotFoundException('Transaction not found.');
+    }
+
+    if (authUser.role === UserRole.PATIENT) {
+      const patient = await this.prisma.patientProfile.findUnique({
+        where: { userId: authUser.sub },
+      });
+      if (!patient || patient.id !== transaction.patientId) {
+        throw new ForbiddenException(
+          'You can only view payment proofs for your own transactions.',
+        );
+      }
+    } else if (authUser.role !== UserRole.ADMIN) {
+      throw new ForbiddenException(
+        'Only patient (owner) or admin can view payment proofs.',
+      );
+    }
+
+    const proofUrl = transaction.paymentProofUrl?.trim();
+    if (!proofUrl) {
+      throw new NotFoundException('No payment proof attached to this transaction.');
+    }
+
+    if (proofUrl.startsWith('https://') || proofUrl.startsWith('http://')) {
+      res.redirect(proofUrl);
+      return;
+    }
+
+    if (!proofUrl.startsWith('/uploads/payment-proofs/')) {
+      throw new BadRequestException('Invalid payment proof storage path.');
+    }
+
+    const filename = proofUrl.replace('/uploads/payment-proofs/', '');
+    if (!filename || filename.includes('..')) {
+      throw new BadRequestException('Invalid payment proof path.');
+    }
+
+    const filePath = join(process.cwd(), 'uploads', 'payment-proofs', filename);
+    if (!existsSync(filePath)) {
+      throw new NotFoundException('Payment proof file not found on server.');
+    }
+
+    res.sendFile(filePath);
   }
 
   private async safeNotify(

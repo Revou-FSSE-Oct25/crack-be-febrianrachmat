@@ -125,19 +125,33 @@ both. The service layer enforces this XOR rule.
 Create a pending transaction. Body must include exactly one of:
 
 ```json
-{ "bookingId": "uuid", "amount": 250000, "paymentMethod": "BANK_TRANSFER" }
+{ "bookingId": "uuid", "paymentMethod": "BANK_TRANSFER", "paymentProofUrl": "https://..." }
 ```
 
 or
 
 ```json
-{ "consultationId": "uuid", "amount": 150000, "paymentMethod": "BANK_TRANSFER" }
+{ "consultationId": "uuid", "paymentMethod": "BANK_TRANSFER", "paymentProofUrl": "https://..." }
 ```
+
+`amount` is **always computed on the server** from `visitFeeSnapshot` (booking) or
+`feeSnapshot` (consultation). Clients must not send `amount`.
+
+Booking-path rules:
+
+- Booking must be `CONFIRMED`, `IN_PROGRESS`, or `COMPLETED` (not `PENDING` / `CANCELLED`).
+- Payment proof required (multipart `proof` and/or `paymentProofUrl` https).
+- Only one `PENDING` or `PAID` transaction per booking (DB-enforced).
 
 Consultation-path rules:
 
 - The consultation must be in `ACCEPTED` status (therapist has agreed).
-- Only one `PENDING` or `PAID` transaction may exist per consultation.
+- Only one `PENDING` or `PAID` transaction may exist per consultation (DB-enforced).
+
+### `GET /transactions/:transactionId/payment-proof` (Role: `PATIENT` owner or `ADMIN`)
+
+Streams uploaded proof files (auth required). External `https://` proofs redirect.
+Public `/uploads/...` static serving is **disabled**.
 
 ### `PATCH /admin/transactions/:transactionId/pay` (Role: `ADMIN`)
 

@@ -24,8 +24,8 @@ This step connects business events to automatic in-app notifications.
 
 ### Transactions (Dummy Payment)
 
-- When patient marks transaction as paid:
-  - Notify patient payment success.
+- When admin confirms transaction as paid (`PATCH .../pay`):
+  - Notify patient payment success (and therapist for consultation path).
 - When admin refunds transaction:
   - Notify patient with refund reason.
 

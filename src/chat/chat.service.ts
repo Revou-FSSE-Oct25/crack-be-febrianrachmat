@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { ConsultationStatus, UserRole } from '@prisma/client';
+import { ConsultationStatus, Prisma, UserRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { AuthUser } from '../common/types/auth-user.type';
@@ -69,21 +69,48 @@ export class ChatService {
       });
     }
 
-    return this.prisma.conversation.create({
-      data: {
-        consultationId: consultation.id,
-        participants: {
-          create: [
-            { userId: consultation.patient.userId },
-            { userId: consultation.physiotherapist.userId },
-          ],
+    const include = {
+      participants: {
+        include: {
+          user: { select: { id: true, fullName: true, email: true } },
         },
       },
-      include: {
-        participants: { include: { user: { select: { id: true, fullName: true, email: true } } } },
-        messages: true,
+      messages: {
+        include: {
+          sender: { select: { id: true, fullName: true, email: true } },
+        },
+        orderBy: { createdAt: 'asc' as const },
       },
-    });
+    };
+
+    try {
+      return await this.prisma.conversation.create({
+        data: {
+          consultationId: consultation.id,
+          participants: {
+            create: [
+              { userId: consultation.patient.userId },
+              { userId: consultation.physiotherapist.userId },
+            ],
+          },
+        },
+        include,
+      });
+    } catch (err) {
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2002'
+      ) {
+        const existing = await this.prisma.conversation.findUnique({
+          where: { consultationId: consultation.id },
+          include,
+        });
+        if (existing) {
+          return existing;
+        }
+      }
+      throw err;
+    }
   }
 
   async listMyConversations(authUser: AuthUser, query: PaginationQueryDto) {
