@@ -9,6 +9,7 @@
     "start:dev": "ts-node-dev --respawn --transpile-only src/main.ts",
     "start:prod": "node dist/main.js",
     "postinstall": "prisma generate",
+    "prepare": "node scripts/setup-git-hooks.mjs",
     "test": "jest --passWithNoTests",
     "test:cov": "jest --coverage",
     "test:integration": "jest --config jest.integration.config.js --runInBand",

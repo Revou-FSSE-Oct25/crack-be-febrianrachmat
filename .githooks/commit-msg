@@ -1,0 +1,7 @@
+#!/bin/sh
+# Strip Co-authored-by trailers (Cursor/AI) so commits stay author-only.
+msg_file="$1"
+[ -f "$msg_file" ] || exit 0
+tmp="${msg_file}.kinova-strip"
+grep -viE '^[[:space:]]*co-authored-by:' "$msg_file" >"$tmp" || exit 0
+mv "$tmp" "$msg_file"
