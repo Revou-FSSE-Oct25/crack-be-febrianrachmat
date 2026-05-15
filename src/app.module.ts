@@ -11,6 +11,7 @@ import { CategoriesModule } from './categories/categories.module';
 import { ChatModule } from './chat/chat.module';
 import { HealthModule } from './health/health.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { PatientsModule } from './patients/patients.module';
 import { PhysiotherapistsModule } from './physiotherapists/physiotherapists.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { ReviewsModule } from './reviews/reviews.module';
@@ -35,6 +36,7 @@ import { UsersModule } from './users/users.module';
     CategoriesModule,
     AvailabilitySlotsModule,
     PhysiotherapistsModule,
+    PatientsModule,
     BookingsModule,
     ChatModule,
     NotificationsModule,
