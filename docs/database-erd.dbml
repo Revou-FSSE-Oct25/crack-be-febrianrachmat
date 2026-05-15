@@ -1,11 +1,15 @@
 // Physiotherapy platform — PostgreSQL schema (Prisma)
 // Published canvas: https://dbdiagram.io/d/Crack-Physio-6a05b6997a923b9472b2f884
 // Import this file at https://dbdiagram.io to edit / export PNG/PDF.
-// Keep in sync with prisma/schema.prisma
+// Keep in sync with prisma/schema.prisma (last aligned: Transaction.paymentProofUrl, indexes).
 
 Project physiotherapy_booking {
   database_type: 'PostgreSQL'
-  Note: 'XOR: Transaction.bookingId XOR Transaction.consultationId (app). Consultation.slaTier + cron auto-refund (Phase 3).'
+  Note: '''
+    XOR: Transaction.bookingId XOR Transaction.consultationId (enforced in app).
+    visitFeeSnapshot on Booking; feeSnapshot + slaTier on Consultation; paymentProofUrl on Transaction.
+    Consultation SLA cron may auto-refund PAID tx if therapist does not reply in window (Phase 3).
+  '''
 }
 
 Enum UserRole {
@@ -62,7 +66,7 @@ Enum PaymentMethod {
 
 Table User {
   id uuid [pk]
-  fullName varchar
+  fullName varchar [not null]
   email varchar [unique, not null]
   passwordHash varchar [not null]
   phoneNumber varchar
@@ -71,7 +75,7 @@ Table User {
   createdAt timestamptz [not null]
   updatedAt timestamptz [not null]
 
-  Note: 'Identity for all roles; 0..1 patient or physio profile.'
+  Note: 'Identity for all roles; at most one patient or physio profile.'
 }
 
 Table PatientProfile {
@@ -113,7 +117,11 @@ Table PhysiotherapistProfile {
   createdAt timestamptz [not null]
   updatedAt timestamptz [not null]
 
-  Note: 'onlineUntil = heartbeat presence for browse + FAST_ONLINE SLA at create.'
+  Indexes {
+    (verificationStatus, onlineUntil)
+  }
+
+  Note: 'visitFee snapshot copied to Booking.visitFeeSnapshot; onlineUntil = heartbeat for browse + FAST_ONLINE gate.'
 }
 
 Table AvailabilitySlot {
@@ -125,6 +133,10 @@ Table AvailabilitySlot {
   isAvailable boolean [not null, default: true]
   createdAt timestamptz [not null]
   updatedAt timestamptz [not null]
+
+  Indexes {
+    (physiotherapistId, slotDate)
+  }
 }
 
 Table Consultation {
@@ -141,7 +153,12 @@ Table Consultation {
   createdAt timestamptz [not null]
   updatedAt timestamptz [not null]
 
-  Note: 'IN_PROGRESS after admin marks transaction PAID; SLA cron refunds if no therapist message.'
+  Indexes {
+    (patientId, physiotherapistId, status)
+    (status, startedAt)
+  }
+
+  Note: 'IN_PROGRESS after admin marks related Transaction PAID; SLA job may refund if no therapist chat reply.'
 }
 
 Table Conversation {
@@ -157,7 +174,10 @@ Table ConversationParticipant {
   userId uuid [not null]
   joinedAt timestamptz [not null]
 
-  Note: 'UNIQUE (conversationId, userId)'
+  Indexes {
+    (conversationId, userId) [unique]
+    (userId)
+  }
 }
 
 Table Message {
@@ -166,6 +186,10 @@ Table Message {
   senderId uuid [not null]
   content text [not null]
   createdAt timestamptz [not null]
+
+  Indexes {
+    (conversationId, createdAt)
+  }
 }
 
 Table Booking {
@@ -183,6 +207,11 @@ Table Booking {
   status BookingStatus [not null, default: 'PENDING']
   createdAt timestamptz [not null]
   updatedAt timestamptz [not null]
+
+  Indexes {
+    (patientId, physiotherapistId, status)
+    (appointmentDate)
+  }
 }
 
 Table Transaction {
@@ -192,15 +221,20 @@ Table Transaction {
   patientId uuid [not null]
   amount decimal(12,2) [not null]
   paymentMethod PaymentMethod [not null]
-  paymentProofUrl text
   status TransactionStatus [not null, default: 'PENDING']
   paidAt timestamptz
   refundedAt timestamptz
   refundReason varchar
+  paymentProofUrl text
   createdAt timestamptz [not null]
   updatedAt timestamptz [not null]
 
-  Note: 'Exactly one of bookingId or consultationId must be non-null (app-enforced XOR).'
+  Indexes {
+    (bookingId, status)
+    (consultationId, status)
+  }
+
+  Note: 'Exactly one of bookingId or consultationId non-null (app XOR). paymentProofUrl required before admin PAID.'
 }
 
 Table Review {
@@ -215,7 +249,10 @@ Table Review {
   createdAt timestamptz [not null]
   updatedAt timestamptz [not null]
 
-  Note: 'UNIQUE (bookingId, patientId)'
+  Indexes {
+    (bookingId, patientId) [unique]
+    (physiotherapistId, rating)
+  }
 }
 
 Table Notification {
@@ -226,9 +263,13 @@ Table Notification {
   isRead boolean [not null, default: false]
   createdAt timestamptz [not null]
   updatedAt timestamptz [not null]
+
+  Indexes {
+    (userId, isRead)
+  }
 }
 
-// --- Relationships (arrow: many → one) ---
+// --- Relationships (dbdiagram: many → one) ---
 
 Ref: User.id - PatientProfile.userId [delete: cascade]
 Ref: User.id - PhysiotherapistProfile.userId [delete: cascade]
