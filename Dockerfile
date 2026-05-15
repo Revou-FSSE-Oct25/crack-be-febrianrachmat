@@ -12,7 +12,11 @@ RUN apk add --no-cache openssl
 COPY package.json package-lock.json prisma.config.ts ./
 COPY prisma ./prisma
 COPY tsconfig.json tsconfig.build.json ./
-RUN npm ci
+# Skip lifecycle scripts during install (postinstall prisma + prepare hooks)
+# to reduce peak RAM on Railway/small builders (exit 137 = OOM).
+ENV SKIP_PRISMA_POSTINSTALL=1
+RUN npm ci --ignore-scripts
+RUN npx prisma generate
 
 # Salin source dan compile.
 COPY src ./src
@@ -26,14 +30,14 @@ WORKDIR /app
 RUN apk add --no-cache openssl
 
 ENV NODE_ENV=production
+ENV SKIP_PRISMA_POSTINSTALL=1
 
-# Hanya butuh runtime deps + hasil build + prisma artifacts untuk migrate/seed.
+# Hanya butuh runtime deps + hasil build + prisma client.
 COPY package.json package-lock.json prisma.config.ts ./
 COPY prisma ./prisma
 
-# `npm ci --omit=dev` melompat devDependencies; `postinstall` di package.json
-# otomatis menjalankan `prisma generate` sehingga client siap pakai di runtime.
-RUN npm ci --omit=dev
+RUN npm ci --omit=dev --ignore-scripts
+RUN npx prisma generate
 
 COPY --from=builder /app/dist ./dist
 

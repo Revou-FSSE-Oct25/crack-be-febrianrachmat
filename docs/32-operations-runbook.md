@@ -94,6 +94,7 @@ Env CI: `DISABLE_THROTTLE=true`, `CONSULTATION_SLA_CRON=false`, placeholder `DAT
 
 | Gejala | Kemungkinan penyebab | Tindakan |
 |--------|----------------------|----------|
+| Docker build `exit code 137` pada `npm ci` | OOM saat `postinstall` + `prisma generate` + devDeps sekaligus | Dockerfile memakai `npm ci --ignore-scripts` lalu `npx prisma generate` terpisah; redeploy dari commit terbaru. |
 | `MODULE_NOT_FOUND` / `dist/main.js` | Build gagal | Cek build logs; pastikan `npm run build` sukses. |
 | DB connection refused dari laptop | Pakai URL internal | Ganti `.env` ke `DATABASE_PUBLIC_URL` (`*.proxy.rlwy.net`). |
 | CORS error dari frontend | Origin tidak diizinkan | Set `CORS_ORIGINS` ke URL frontend. |
