@@ -67,6 +67,8 @@ model User {
   email         String      @unique
   passwordHash  String
   phoneNumber   String?
+  /// Relative path `/uploads/avatars/...` or external https URL.
+  avatarUrl     String?
   role          UserRole
   isActive      Boolean     @default(true)
   createdAt     DateTime    @default(now())
