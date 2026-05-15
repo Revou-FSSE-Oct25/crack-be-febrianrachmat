@@ -6,6 +6,20 @@ import { getJwtSecret } from '../common/security/jwt-config';
 import { PrismaModule } from '../prisma/prisma.module';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
+import {
+  AppleOAuthEnabledGuard,
+  AppleOAuthStartGuard,
+  FacebookOAuthEnabledGuard,
+  FacebookOAuthStartGuard,
+  GithubOAuthEnabledGuard,
+  GithubOAuthStartGuard,
+  GoogleOAuthEnabledGuard,
+  GoogleOAuthStartGuard,
+} from './oauth/guards/oauth-start.guard';
+import { OAuthController } from './oauth/oauth.controller';
+import { buildOAuthStrategyProviders } from './oauth/oauth.providers';
+import { OAuthService } from './oauth/oauth.service';
+import { OAuthStateService } from './oauth/oauth-state.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 
 @Module({
@@ -20,8 +34,22 @@ import { JwtStrategy } from './strategies/jwt.strategy';
       }),
     }),
   ],
-  controllers: [AuthController],
-  providers: [AuthService, JwtStrategy],
+  controllers: [AuthController, OAuthController],
+  providers: [
+    AuthService,
+    JwtStrategy,
+    OAuthService,
+    OAuthStateService,
+    GoogleOAuthEnabledGuard,
+    GoogleOAuthStartGuard,
+    GithubOAuthEnabledGuard,
+    GithubOAuthStartGuard,
+    FacebookOAuthEnabledGuard,
+    FacebookOAuthStartGuard,
+    AppleOAuthEnabledGuard,
+    AppleOAuthStartGuard,
+    ...buildOAuthStrategyProviders(),
+  ],
   exports: [AuthService],
 })
 export class AuthModule {}

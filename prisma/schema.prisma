@@ -60,12 +60,20 @@ enum PaymentMethod {
   QRIS
 }
 
+enum OAuthProvider {
+  GOOGLE
+  APPLE
+  GITHUB
+  FACEBOOK
+}
+
 model User {
   /// Shared identity table for all roles (admin, patient, physiotherapist).
   id            String      @id @default(uuid())
   fullName      String
   email         String      @unique
-  passwordHash  String
+  /// Null for OAuth-only accounts (Google, Apple, GitHub, Facebook).
+  passwordHash  String?
   phoneNumber   String?
   /// Relative path `/uploads/avatars/...` or external https URL.
   avatarUrl     String?
@@ -76,9 +84,25 @@ model User {
 
   patientProfile        PatientProfile?
   physiotherapistProfile PhysiotherapistProfile?
+  oauthAccounts         OAuthAccount[]
   notifications         Notification[]
   sentMessages          Message[]
   conversationMembers   ConversationParticipant[]
+}
+
+model OAuthAccount {
+  id                String         @id @default(uuid())
+  userId            String
+  provider          OAuthProvider
+  providerAccountId String
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@unique([userId, provider])
+  @@index([userId])
 }
 
 model PatientProfile {

@@ -350,6 +350,12 @@ export class UsersService {
       throw new BadRequestException('Account is already inactive.');
     }
 
+    if (!user.passwordHash) {
+      throw new BadRequestException(
+        'Akun masuk lewat Google/Apple/GitHub/Facebook. Nonaktifkan lewat penyedia masuk atau hubungi dukungan.',
+      );
+    }
+
     const isValid = await compare(dto.currentPassword, user.passwordHash);
     if (!isValid) {
       throw new UnauthorizedException('Current password is incorrect.');
@@ -380,6 +386,12 @@ export class UsersService {
 
     if (!user) {
       throw new NotFoundException('User not found.');
+    }
+
+    if (!user.passwordHash) {
+      throw new BadRequestException(
+        'Akun masuk lewat Google/Apple/GitHub/Facebook. Atur kata sandi belum tersedia untuk akun ini.',
+      );
     }
 
     const isCurrentPasswordValid = await compare(

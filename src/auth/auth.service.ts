@@ -88,6 +88,12 @@ export class AuthService {
       throw new UnauthorizedException('Invalid email or password.');
     }
 
+    if (!user.passwordHash) {
+      throw new UnauthorizedException(
+        'This account uses social login. Sign in with Google, Apple, GitHub, or Facebook.',
+      );
+    }
+
     const isPasswordValid = await compare(dto.password, user.passwordHash);
     if (!isPasswordValid) {
       throw new UnauthorizedException('Invalid email or password.');
