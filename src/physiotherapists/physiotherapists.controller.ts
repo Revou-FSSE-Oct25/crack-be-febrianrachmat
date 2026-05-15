@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   Query,
@@ -56,6 +57,13 @@ export class PhysiotherapistsController {
     return this.physiotherapistsService.touchMyOnlinePresence(
       req.user as AuthUser,
     );
+  }
+
+  @Roles(UserRole.PATIENT, UserRole.ADMIN, UserRole.PHYSIOTHERAPIST)
+  @Get('physiotherapists/:profileId')
+  @ApiOperation({ summary: 'Get approved physiotherapist profile by id' })
+  getById(@Param('profileId', ParseUUIDPipe) profileId: string) {
+    return this.physiotherapistsService.getApprovedById(profileId);
   }
 
   @Roles(UserRole.PATIENT, UserRole.ADMIN)

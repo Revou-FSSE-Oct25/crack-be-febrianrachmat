@@ -115,6 +115,29 @@ export class PhysiotherapistsService {
     return updated;
   }
 
+  async getApprovedById(profileId: string) {
+    const profile = await this.prisma.physiotherapistProfile.findFirst({
+      where: {
+        id: profileId,
+        verificationStatus: TherapistVerificationStatus.APPROVED,
+      },
+      include: {
+        user: {
+          select: { id: true, fullName: true, email: true, phoneNumber: true },
+        },
+        category: true,
+      },
+    });
+
+    if (!profile) {
+      throw new NotFoundException(
+        'Physiotherapist not found or not approved yet.',
+      );
+    }
+
+    return profile;
+  }
+
   async browseApproved(query: BrowsePhysiotherapistsQueryDto) {
     const page = query.page ?? 1;
     const limit = query.limit ?? 10;
