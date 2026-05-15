@@ -40,7 +40,7 @@ Lihat `.env.example`. Ringkasan:
 | Variable | Contoh |
 |----------|--------|
 | `CORS_ORIGINS` | URL frontend (pisah koma), mis. `https://crack-fe-febrianrachmat-production.up.railway.app` |
-| `JWT_SECRET` | Min. 32 karakter, bukan nilai default dari `.env.example` |
+| `JWT_SECRET` | Min. 32 karakter acak, bukan `replace-with-a-strong-secret`. Generate: `openssl rand -base64 48` |
 
 Tanpa `CORS_ORIGINS`, deploy tetap hidup tetapi browser memblokir request lintas-origin sampai variabel di-set.
 | `RUN_DB_SEED` | Opsional | `true` sekali setelah deploy untuk memuat `prisma/seed.ts`. |

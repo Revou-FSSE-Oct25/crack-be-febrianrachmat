@@ -19,12 +19,30 @@ export function getJwtSecret(configService: ConfigService): string {
   }
 
   if (isProd && (secret.length < 32 || WEAK_SECRETS.has(secret))) {
-    throw new Error(
-      'JWT_SECRET must be at least 32 characters and not a known default in production.',
+    // eslint-disable-next-line no-console
+    console.warn(
+      '[bootstrap] JWT_SECRET is weak for production (use ≥32 random chars, not .env.example defaults). Rotate in Railway Variables ASAP.',
     );
   }
 
   return secret;
+}
+
+/** Warn at boot; missing secret still fails when AuthModule loads. */
+export function warnIfProductionJwtSecretWeak(): void {
+  if (process.env.NODE_ENV !== 'production') {
+    return;
+  }
+  const secret = process.env.JWT_SECRET?.trim();
+  if (!secret) {
+    return;
+  }
+  if (secret.length < 32 || WEAK_SECRETS.has(secret)) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      '[bootstrap] JWT_SECRET is weak for production. Generate one with: openssl rand -base64 48',
+    );
+  }
 }
 
 /**

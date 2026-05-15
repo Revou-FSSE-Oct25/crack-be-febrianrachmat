@@ -5,7 +5,10 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
-import { assertProductionCorsOrigins } from './common/security/jwt-config';
+import {
+  assertProductionCorsOrigins,
+  warnIfProductionJwtSecretWeak,
+} from './common/security/jwt-config';
 import { buildCorsOptions } from './common/security/cors-options';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './auth/guards/roles.guard';
@@ -14,6 +17,7 @@ import { TransformResponseInterceptor } from './common/interceptors/transform-re
 
 async function bootstrap(): Promise<void> {
   assertProductionCorsOrigins();
+  warnIfProductionJwtSecretWeak();
 
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
