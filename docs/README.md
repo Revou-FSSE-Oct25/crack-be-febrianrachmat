@@ -31,7 +31,7 @@ Things that apply to every feature.
 | File | Topic |
 |---|---|
 | [`01-backend-foundation.md`](./01-backend-foundation.md) | NestJS bootstrap, Prisma wiring, health endpoint, env template. |
-| [`02-database-schema.md`](./02-database-schema.md) | Prisma model, **published ERD on dbdiagram.io**, DBML (`database-erd.dbml`), Mermaid overview. |
+| [`02-database-schema.md`](./02-database-schema.md) | Prisma model, **ERD (dbdiagram):** [Crack-Physio](https://dbdiagram.io/d/Crack-Physio-6a05b6997a923b9472b2f884), DBML [`database-erd.dbml`](./database-erd.dbml), Mermaid overview. |
 | [`03-response-standardization.md`](./03-response-standardization.md) | Success envelope (`{ success, data, meta }`) and error envelope. |
 | [`04-swagger-api-docs.md`](./04-swagger-api-docs.md) | Where to find OpenAPI docs and how to authorize from Swagger UI. |
 
@@ -67,5 +67,6 @@ How the API is hardened and tested.
 
 - **Run the API**: see `01-backend-foundation.md`.
 - **Authenticate from Postman/Swagger**: see `10-auth-feature.md` + `04-swagger-api-docs.md`.
+- **Published ERD (dbdiagram.io):** [https://dbdiagram.io/d/Crack-Physio-6a05b6997a923b9472b2f884](https://dbdiagram.io/d/Crack-Physio-6a05b6997a923b9472b2f884) — source DBML: [`database-erd.dbml`](./database-erd.dbml).
 - **Understand the data model**: see `02-database-schema.md`.
 - **Run tests / check coverage**: see `31-testing-notes.md`.
