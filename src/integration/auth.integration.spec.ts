@@ -287,6 +287,7 @@ describe('Core integration (real DB, no service mocks)', () => {
       .set('Authorization', `Bearer ${patientToken}`)
       .send({
         bookingId,
+        paymentProofUrl: 'https://example.com/integration-mock-payment-proof.png',
         paymentMethod: 'BANK_TRANSFER',
       })
       .expect(201);
@@ -403,6 +404,7 @@ describe('Core integration (real DB, no service mocks)', () => {
       .set('Authorization', `Bearer ${patientToken}`)
       .send({
         consultationId,
+        paymentProofUrl: 'https://example.com/integration-mock-payment-proof.png',
         paymentMethod: 'BANK_TRANSFER',
       })
       .expect(201);
@@ -462,6 +464,7 @@ describe('Core integration (real DB, no service mocks)', () => {
       .set('Authorization', `Bearer ${patientToken}`)
       .send({
         bookingId: booking.id,
+        paymentProofUrl: 'https://example.com/integration-mock-payment-proof.png',
         paymentMethod: 'BANK_TRANSFER',
       })
       .expect(201);
@@ -680,6 +683,7 @@ describe('Core integration (real DB, no service mocks)', () => {
       .set('Authorization', `Bearer ${patientToken}`)
       .send({
         bookingId,
+        paymentProofUrl: 'https://example.com/integration-mock-payment-proof.png',
         paymentMethod: 'BANK_TRANSFER',
       })
       .expect(201);

@@ -192,6 +192,7 @@ Table Transaction {
   patientId uuid [not null]
   amount decimal(12,2) [not null]
   paymentMethod PaymentMethod [not null]
+  paymentProofUrl text
   status TransactionStatus [not null, default: 'PENDING']
   paidAt timestamptz
   refundedAt timestamptz

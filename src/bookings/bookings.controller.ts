@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -7,7 +8,11 @@ import {
   Post,
   Query,
   Req,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import type { Express } from 'express';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { UserRole } from '@prisma/client';
 import { Request } from 'express';
@@ -21,6 +26,10 @@ import { CreateTransactionDto } from './dto/create-transaction.dto';
 import { RefundTransactionDto } from './dto/refund-transaction.dto';
 import { UpdateBookingStatusDto } from './dto/update-booking-status.dto';
 import { UpdateConsultationStatusDto } from './dto/update-consultation-status.dto';
+import {
+  paymentProofDiskStorage,
+  paymentProofUploadLimits,
+} from './payment-proof-upload';
 
 @ApiTags('Consultations & Bookings & Transactions')
 @ApiBearerAuth('access-token')
@@ -94,9 +103,35 @@ export class BookingsController {
   // Dummy transaction endpoints
   @Roles(UserRole.PATIENT)
   @Post('transactions')
-  @ApiOperation({ summary: 'Create pending transaction (patient)' })
-  createTransaction(@Req() req: Request, @Body() dto: CreateTransactionDto) {
-    return this.bookingsService.createTransaction(req.user as AuthUser, dto);
+  @UseInterceptors(
+    FileInterceptor('proof', {
+      storage: paymentProofDiskStorage(),
+      limits: paymentProofUploadLimits,
+    }),
+  )
+  @ApiOperation({
+    summary:
+      'Create pending transaction (patient); lampirkan bukti lewat upload `proof` (gambar) atau `paymentProofUrl` (https)',
+  })
+  createTransaction(
+    @Req() req: Request,
+    @Body() dto: CreateTransactionDto,
+    @UploadedFile() proof?: Express.Multer.File,
+  ) {
+    let uploadedPublicPath: string | undefined;
+    if (proof) {
+      if (!proof.mimetype?.startsWith('image/')) {
+        throw new BadRequestException(
+          'Bukti bayar harus berupa gambar (mis. JPEG, PNG, WebP).',
+        );
+      }
+      uploadedPublicPath = `/uploads/payment-proofs/${proof.filename}`;
+    }
+    return this.bookingsService.createTransaction(
+      req.user as AuthUser,
+      dto,
+      uploadedPublicPath,
+    );
   }
 
   @Roles(UserRole.ADMIN)

@@ -274,6 +274,8 @@ model Transaction {
   paidAt           DateTime?
   refundedAt       DateTime?
   refundReason     String?
+  /// Bukti transfer: URL https (mis. drive) atau path `/uploads/payment-proofs/...` dari upload.
+  paymentProofUrl  String?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 

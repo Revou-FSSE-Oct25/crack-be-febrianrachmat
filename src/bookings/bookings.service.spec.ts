@@ -423,6 +423,7 @@ describe('BookingsService', () => {
       PATIENT_USER,
       {
         bookingId: 'booking-1',
+        paymentProofUrl: 'https://example.com/payment-proof.png',
         paymentMethod: 'BANK_TRANSFER',
       },
     );
@@ -433,6 +434,7 @@ describe('BookingsService', () => {
           bookingId: 'booking-1',
           patientId: 'patient-1',
           status: TransactionStatus.PENDING,
+          paymentProofUrl: 'https://example.com/payment-proof.png',
         }),
       }),
     );
@@ -455,6 +457,7 @@ describe('BookingsService', () => {
 
     await service.createTransaction(PATIENT_USER, {
       consultationId: 'consultation-1',
+      paymentProofUrl: 'https://example.com/payment-proof.png',
       paymentMethod: 'BANK_TRANSFER',
     });
 
@@ -464,6 +467,7 @@ describe('BookingsService', () => {
           consultationId: 'consultation-1',
           patientId: 'patient-1',
           status: TransactionStatus.PENDING,
+          paymentProofUrl: 'https://example.com/payment-proof.png',
         }),
       }),
     );
@@ -485,6 +489,7 @@ describe('BookingsService', () => {
     await expect(
       service.createTransaction(PATIENT_USER, {
         consultationId: 'consultation-1',
+        paymentProofUrl: 'https://example.com/payment-proof.png',
         paymentMethod: 'BANK_TRANSFER',
       }),
     ).rejects.toThrow(BadRequestException);
@@ -506,6 +511,7 @@ describe('BookingsService', () => {
     await expect(
       service.createTransaction(PATIENT_USER, {
         consultationId: 'consultation-1',
+        paymentProofUrl: 'https://example.com/payment-proof.png',
         paymentMethod: 'BANK_TRANSFER',
       }),
     ).rejects.toThrow(BadRequestException);
@@ -546,9 +552,27 @@ describe('BookingsService', () => {
         PATIENT_USER,
         {
           bookingId: 'booking-1',
+          paymentProofUrl: 'https://example.com/payment-proof.png',
           paymentMethod: 'BANK_TRANSFER',
         },
       ),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it('rejects booking transaction when payment proof is missing', async () => {
+    prismaMock.patientProfile.findUnique.mockResolvedValue({ id: 'patient-1' });
+    prismaMock.booking.findUnique.mockResolvedValue({
+      id: 'booking-1',
+      patientId: 'patient-1',
+      visitFeeSnapshot: 100,
+    });
+    prismaMock.transaction.findFirst.mockResolvedValue(null);
+
+    await expect(
+      service.createTransaction(PATIENT_USER, {
+        bookingId: 'booking-1',
+        paymentMethod: 'BANK_TRANSFER',
+      }),
     ).rejects.toThrow(BadRequestException);
   });
 
@@ -560,6 +584,7 @@ describe('BookingsService', () => {
       consultationId: null,
       consultation: null,
       status: TransactionStatus.PENDING,
+      paymentProofUrl: 'https://example.com/payment-proof.png',
     });
     prismaMock.transaction.update.mockResolvedValue({
       id: 'tx-1',
@@ -597,6 +622,7 @@ describe('BookingsService', () => {
         physiotherapist: { userId: 'therapist-user-1' },
       },
       status: TransactionStatus.PENDING,
+      paymentProofUrl: 'https://example.com/payment-proof.png',
     });
     prismaMock.transaction.update.mockResolvedValue({
       id: 'tx-c-1',
@@ -631,6 +657,7 @@ describe('BookingsService', () => {
       consultationId: null,
       consultation: null,
       status: TransactionStatus.PENDING,
+      paymentProofUrl: 'https://example.com/payment-proof.png',
     });
     prismaMock.transaction.update.mockResolvedValue({
       id: 'tx-1',
@@ -658,6 +685,23 @@ describe('BookingsService', () => {
     await expect(service.markTransactionPaidByAdmin('tx-404')).rejects.toThrow(
       NotFoundException,
     );
+  });
+
+  it('rejects mark paid by admin when payment proof is missing', async () => {
+    prismaMock.transaction.findUnique.mockResolvedValue({
+      id: 'tx-1',
+      patientId: 'patient-1',
+      bookingId: 'booking-1',
+      consultationId: null,
+      consultation: null,
+      status: TransactionStatus.PENDING,
+      paymentProofUrl: null,
+    });
+
+    await expect(service.markTransactionPaidByAdmin('tx-1')).rejects.toThrow(
+      BadRequestException,
+    );
+    expect(prismaMock.transaction.update).not.toHaveBeenCalled();
   });
 
   it('rejects refund when transaction is not PAID', async () => {

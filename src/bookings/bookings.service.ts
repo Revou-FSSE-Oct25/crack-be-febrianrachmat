@@ -569,7 +569,11 @@ export class BookingsService {
     }
   }
 
-  async createTransaction(authUser: AuthUser, dto: CreateTransactionDto) {
+  async createTransaction(
+    authUser: AuthUser,
+    dto: CreateTransactionDto,
+    uploadedProofPublicPath?: string,
+  ) {
     const patient = await this.prisma.patientProfile.findUnique({
       where: { userId: authUser.sub },
     });
@@ -606,6 +610,16 @@ export class BookingsService {
       }
 
       const amount = new Prisma.Decimal(booking.visitFeeSnapshot.toString());
+      const proof = (
+        uploadedProofPublicPath?.trim() ||
+        dto.paymentProofUrl?.trim() ||
+        ''
+      ).trim();
+      if (!proof) {
+        throw new BadRequestException(
+          'Lampirkan bukti pembayaran: unggah gambar (JPEG, PNG, atau WebP) atau tautan https ke bukti Anda.',
+        );
+      }
       return this.prisma.transaction.create({
         data: {
           bookingId: booking.id,
@@ -613,6 +627,7 @@ export class BookingsService {
           amount,
           paymentMethod: dto.paymentMethod,
           status: TransactionStatus.PENDING,
+          paymentProofUrl: proof,
         },
       });
     }
@@ -650,6 +665,16 @@ export class BookingsService {
     }
 
     const amount = new Prisma.Decimal(consultation.feeSnapshot.toString());
+    const proof = (
+      uploadedProofPublicPath?.trim() ||
+      dto.paymentProofUrl?.trim() ||
+      ''
+    ).trim();
+    if (!proof) {
+      throw new BadRequestException(
+        'Lampirkan bukti pembayaran: unggah gambar (JPEG, PNG, atau WebP) atau tautan https ke bukti Anda.',
+      );
+    }
     return this.prisma.transaction.create({
       data: {
         consultationId: consultation.id,
@@ -657,6 +682,7 @@ export class BookingsService {
         amount,
         paymentMethod: dto.paymentMethod,
         status: TransactionStatus.PENDING,
+        paymentProofUrl: proof,
       },
     });
   }
@@ -678,6 +704,11 @@ export class BookingsService {
     }
     if (transaction.status !== TransactionStatus.PENDING) {
       throw new BadRequestException('Only pending transaction can be marked as paid.');
+    }
+    if (!transaction.paymentProofUrl?.trim()) {
+      throw new BadRequestException(
+        'Cannot confirm payment: no payment proof is attached to this transaction.',
+      );
     }
 
     const now = new Date();
