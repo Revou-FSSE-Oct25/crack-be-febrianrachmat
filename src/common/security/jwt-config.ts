@@ -54,10 +54,11 @@ export function assertProductionCorsOrigins(): void {
     return;
   }
   const raw = process.env.CORS_ORIGINS?.trim();
-  if (!raw) {
+  const frontend = process.env.FRONTEND_URL?.trim();
+  if (!raw && !frontend) {
     // eslint-disable-next-line no-console
     console.warn(
-      '[bootstrap] CORS_ORIGINS is unset in production. Set comma-separated frontend URLs (e.g. https://your-app.up.railway.app). Until then, browser cross-origin API calls are blocked.',
+      '[bootstrap] CORS_ORIGINS (or FRONTEND_URL) is unset in production. Set e.g. CORS_ORIGINS=https://crack-fe-febrianrachmat-production.up.railway.app — until then, browser cross-origin API calls are blocked.',
     );
   }
 }

@@ -1,10 +1,19 @@
 /**
  * `CORS_ORIGINS` — daftar origin yang diizinkan, dipisah koma (tanpa spasi wajib).
- * Kosong = mode dev-friendly (Nest mengizinkan semua origin).
- * Produksi: set ke URL frontend, mis. `https://app.example.com,https://www.example.com`.
+ * Fallback: `FRONTEND_URL` (satu origin) jika `CORS_ORIGINS` kosong.
+ * Kosong di non-prod = izinkan semua origin (dev).
+ */
+export function resolveCorsOriginsRaw(): string {
+  const explicit = process.env.CORS_ORIGINS?.trim();
+  if (explicit) return explicit;
+  return process.env.FRONTEND_URL?.trim() ?? '';
+}
+
+/**
+ * Build NestJS CORS options from environment.
  */
 export function buildCorsOptions() {
-  const raw = process.env.CORS_ORIGINS?.trim();
+  const raw = resolveCorsOriginsRaw();
   const isProd = process.env.NODE_ENV === 'production';
   if (!raw) {
     if (isProd) {
