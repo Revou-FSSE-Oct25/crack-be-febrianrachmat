@@ -18,12 +18,15 @@ import {
 } from './oauth/guards/oauth-start.guard';
 import { OAuthController } from './oauth/oauth.controller';
 import { buildOAuthStrategyProviders } from './oauth/oauth.providers';
+import { EmailVerificationService } from './email-verification.service';
 import { OAuthService } from './oauth/oauth.service';
 import { OAuthStateService } from './oauth/oauth-state.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
+import { MailModule } from '../mail/mail.module';
 
 @Module({
   imports: [
+    MailModule,
     PrismaModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
@@ -37,6 +40,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
   controllers: [AuthController, OAuthController],
   providers: [
     AuthService,
+    EmailVerificationService,
     JwtStrategy,
     OAuthService,
     OAuthStateService,

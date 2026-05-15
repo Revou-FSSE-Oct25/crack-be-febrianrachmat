@@ -13,6 +13,7 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Request, Response } from 'express';
+import { AllowUnverifiedEmail } from '../auth/decorators/allow-unverified-email.decorator';
 import { AuthUser } from '../common/types/auth-user.type';
 import {
   avatarDiskStorage,
@@ -30,6 +31,7 @@ import { UsersService } from './users.service';
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
+  @AllowUnverifiedEmail()
   @Get('me')
   @ApiOperation({ summary: 'Get current user profile' })
   getMyProfile(@Req() req: Request) {

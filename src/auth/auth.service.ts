@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -7,6 +8,7 @@ import { UserRole } from '@prisma/client';
 import { JwtService } from '@nestjs/jwt';
 import { compare, hash } from 'bcryptjs';
 import { PrismaService } from '../prisma/prisma.service';
+import { EmailVerificationService } from './email-verification.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { JwtPayload } from './interfaces/jwt-payload.interface';
@@ -17,27 +19,39 @@ type AuthUserResponse = {
   email: string;
   role: UserRole;
   isActive: boolean;
+  emailVerified: boolean;
 };
+
+export type RegisterResult =
+  | {
+      requiresEmailVerification: true;
+      email: string;
+      message: string;
+    }
+  | {
+      requiresEmailVerification: false;
+      accessToken: string;
+      user: AuthUserResponse;
+    };
 
 @Injectable()
 export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
+    private readonly emailVerification: EmailVerificationService,
   ) {}
 
-  async register(dto: RegisterDto): Promise<{
-    accessToken: string;
-    user: AuthUserResponse;
-  }> {
+  async register(dto: RegisterDto): Promise<RegisterResult> {
     if (dto.role === UserRole.ADMIN) {
       throw new BadRequestException(
         'Public registration cannot create admin account.',
       );
     }
 
+    const email = dto.email.toLowerCase();
     const existingUser = await this.prisma.user.findUnique({
-      where: { email: dto.email.toLowerCase() },
+      where: { email },
     });
 
     if (existingUser) {
@@ -45,21 +59,23 @@ export class AuthService {
     }
 
     const passwordHash = await hash(dto.password, 10);
+    const emailVerifiedAt =
+      this.emailVerification.verifiedAtForNewPasswordUser();
 
     const createdUser = await this.prisma.user.create({
       data: {
         fullName: dto.fullName,
-        email: dto.email.toLowerCase(),
+        email,
         passwordHash,
         phoneNumber: dto.phoneNumber,
         role: dto.role,
+        emailVerifiedAt,
         patientProfile:
           dto.role === UserRole.PATIENT ? { create: {} } : undefined,
         physiotherapistProfile:
           dto.role === UserRole.PHYSIOTHERAPIST
             ? {
                 create: {
-                  // Default fees for new therapist; updated in profile flow.
                   consultationFee: 0,
                   visitFee: 0,
                 },
@@ -68,9 +84,24 @@ export class AuthService {
       },
     });
 
-    const accessToken = await this.signToken(createdUser.id, createdUser.email, createdUser.role);
+    if (this.emailVerification.isRequired() && !emailVerifiedAt) {
+      await this.emailVerification.sendVerificationEmail(createdUser);
+      return {
+        requiresEmailVerification: true,
+        email: createdUser.email,
+        message:
+          'Kami mengirim link verifikasi ke email Anda. Buka email tersebut, lalu masuk setelah verifikasi.',
+      };
+    }
+
+    const accessToken = await this.signToken(
+      createdUser.id,
+      createdUser.email,
+      createdUser.role,
+    );
 
     return {
+      requiresEmailVerification: false,
       accessToken,
       user: this.mapAuthUser(createdUser),
     };
@@ -103,6 +134,15 @@ export class AuthService {
       throw new UnauthorizedException('Your account is inactive.');
     }
 
+    if (
+      this.emailVerification.isRequired() &&
+      !user.emailVerifiedAt
+    ) {
+      throw new ForbiddenException(
+        'Email belum diverifikasi. Periksa inbox atau kirim ulang link verifikasi.',
+      );
+    }
+
     const accessToken = await this.signToken(user.id, user.email, user.role);
 
     return {
@@ -131,6 +171,7 @@ export class AuthService {
     email: string;
     role: UserRole;
     isActive: boolean;
+    emailVerifiedAt?: Date | null;
   }): AuthUserResponse {
     return {
       id: user.id,
@@ -138,6 +179,7 @@ export class AuthService {
       email: user.email,
       role: user.role,
       isActive: user.isActive,
+      emailVerified: Boolean(user.emailVerifiedAt),
     };
   }
 }

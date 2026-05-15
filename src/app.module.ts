@@ -10,6 +10,7 @@ import { BookingsModule } from './bookings/bookings.module';
 import { CategoriesModule } from './categories/categories.module';
 import { ChatModule } from './chat/chat.module';
 import { HealthModule } from './health/health.module';
+import { MailModule } from './mail/mail.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { PatientsModule } from './patients/patients.module';
 import { PhysiotherapistsModule } from './physiotherapists/physiotherapists.module';
@@ -30,6 +31,7 @@ import { UsersModule } from './users/users.module';
         'Terlalu banyak permintaan dari alamat ini. Coba lagi dalam beberapa saat.',
     }),
     PrismaModule,
+    MailModule,
     AdminModule,
     AuthModule,
     UsersModule,

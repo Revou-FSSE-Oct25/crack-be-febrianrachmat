@@ -107,14 +107,29 @@ export class OAuthService {
       });
 
       if (existingByEmail) {
-        await this.prisma.oAuthAccount.create({
-          data: {
-            userId: existingByEmail.id,
-            provider,
-            providerAccountId: profile.providerAccountId,
-          },
-        });
-        return existingByEmail;
+        await this.prisma.$transaction([
+          this.prisma.oAuthAccount.create({
+            data: {
+              userId: existingByEmail.id,
+              provider,
+              providerAccountId: profile.providerAccountId,
+            },
+          }),
+          ...(existingByEmail.emailVerifiedAt
+            ? []
+            : [
+                this.prisma.user.update({
+                  where: { id: existingByEmail.id },
+                  data: { emailVerifiedAt: new Date() },
+                }),
+              ]),
+        ]);
+        return existingByEmail.emailVerifiedAt
+          ? existingByEmail
+          : {
+              ...existingByEmail,
+              emailVerifiedAt: new Date(),
+            };
       }
     } else if (!email) {
       throw new UnauthorizedException(
@@ -131,6 +146,7 @@ export class OAuthService {
       data: {
         fullName: profile.fullName,
         email: email!,
+        emailVerifiedAt: new Date(),
         role,
         patientProfile:
           role === UserRole.PATIENT ? { create: {} } : undefined,

@@ -46,12 +46,14 @@ async function upsertUser(params: {
       role: params.role,
       passwordHash,
       isActive: true,
+      emailVerifiedAt: new Date(),
     },
     update: {
       fullName: params.fullName,
       role: params.role,
       passwordHash,
       isActive: true,
+      emailVerifiedAt: new Date(),
     },
     select: { id: true },
   });
