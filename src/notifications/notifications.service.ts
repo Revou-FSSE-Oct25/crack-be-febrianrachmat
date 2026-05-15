@@ -3,10 +3,14 @@ import { PrismaService } from '../prisma/prisma.service';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { AuthUser } from '../common/types/auth-user.type';
 import { CreateNotificationDto } from './dto/create-notification.dto';
+import { EmailMockService } from './email-mock.service';
 
 @Injectable()
 export class NotificationsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly emailMock: EmailMockService,
+  ) {}
 
   async listMyNotifications(authUser: AuthUser, query: PaginationQueryDto) {
     const skip = (query.page - 1) * query.limit;
@@ -29,6 +33,14 @@ export class NotificationsService {
       totalPages: Math.ceil(total / query.limit),
       items,
     };
+  }
+
+  async getUnreadCount(authUser: AuthUser) {
+    const unreadCount = await this.prisma.notification.count({
+      where: { userId: authUser.sub, isRead: false },
+    });
+
+    return { unreadCount };
   }
 
   async markAsRead(authUser: AuthUser, notificationId: string) {
@@ -63,24 +75,11 @@ export class NotificationsService {
       throw new BadRequestException('Target user does not exist.');
     }
 
-    return this.prisma.notification.create({
-      data: {
-        userId,
-        title: dto.title,
-        body: dto.body,
-      },
-    });
+    return this.dispatchNotification(userId, dto.title, dto.body);
   }
 
-  // Internal helper used by domain services to emit system notifications.
   async createSystemNotification(userId: string, title: string, body: string) {
-    return this.prisma.notification.create({
-      data: {
-        userId,
-        title,
-        body,
-      },
-    });
+    return this.dispatchNotification(userId, title, body);
   }
 
   async broadcastToAllUsers(dto: CreateNotificationDto) {
@@ -93,17 +92,42 @@ export class NotificationsService {
       return { message: 'No active users found.', createdCount: 0 };
     }
 
-    const result = await this.prisma.notification.createMany({
-      data: users.map((user) => ({
-        userId: user.id,
-        title: dto.title,
-        body: dto.body,
-      })),
-    });
+    const notifications = await Promise.all(
+      users.map((user) =>
+        this.dispatchNotification(user.id, dto.title, dto.body),
+      ),
+    );
 
     return {
       message: 'Broadcast notification sent.',
-      createdCount: result.count,
+      createdCount: notifications.length,
     };
+  }
+
+  private async dispatchNotification(
+    userId: string,
+    title: string,
+    body: string,
+  ) {
+    const notification = await this.prisma.notification.create({
+      data: {
+        userId,
+        title,
+        body,
+      },
+    });
+
+    await this.emailMock
+      .sendNotificationEmail({
+        userId,
+        title,
+        body,
+        notificationId: notification.id,
+      })
+      .catch(() => {
+        // Email mock must not break in-app notifications.
+      });
+
+    return notification;
   }
 }

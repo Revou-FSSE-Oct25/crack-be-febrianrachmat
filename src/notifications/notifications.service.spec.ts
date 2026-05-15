@@ -20,7 +20,14 @@ describe('NotificationsService', () => {
     $transaction: jest.fn(),
   };
 
-  const service = new NotificationsService(prismaMock as never);
+  const emailMockMock = {
+    sendNotificationEmail: jest.fn().mockResolvedValue(undefined),
+  };
+
+  const service = new NotificationsService(
+    prismaMock as never,
+    emailMockMock as never,
+  );
   const PATIENT_USER = {
     sub: 'user-1',
     email: 'u@mail.com',
@@ -119,23 +126,31 @@ describe('NotificationsService', () => {
 
   it('broadcastToAllUsers creates notifications for all active users', async () => {
     prismaMock.user.findMany.mockResolvedValue([{ id: 'u1' }, { id: 'u2' }]);
-    prismaMock.notification.createMany.mockResolvedValue({ count: 2 });
+    prismaMock.notification.create
+      .mockResolvedValueOnce({ id: 'n1', userId: 'u1' })
+      .mockResolvedValueOnce({ id: 'n2', userId: 'u2' });
 
     const result = await service.broadcastToAllUsers({
       title: 'Promo',
       body: 'Diskon',
     });
 
-    expect(prismaMock.notification.createMany).toHaveBeenCalledWith({
-      data: [
-        { userId: 'u1', title: 'Promo', body: 'Diskon' },
-        { userId: 'u2', title: 'Promo', body: 'Diskon' },
-      ],
-    });
+    expect(prismaMock.notification.create).toHaveBeenCalledTimes(2);
     expect(result).toEqual({
       message: 'Broadcast notification sent.',
       createdCount: 2,
     });
+  });
+
+  it('getUnreadCount returns unread total for current user', async () => {
+    prismaMock.notification.count.mockResolvedValue(4);
+
+    const result = await service.getUnreadCount(PATIENT_USER);
+
+    expect(prismaMock.notification.count).toHaveBeenCalledWith({
+      where: { userId: 'user-1', isRead: false },
+    });
+    expect(result).toEqual({ unreadCount: 4 });
   });
 
   // helper methods

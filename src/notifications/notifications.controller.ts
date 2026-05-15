@@ -25,6 +25,13 @@ export class NotificationsController {
   }
 
   @Roles(UserRole.ADMIN, UserRole.PATIENT, UserRole.PHYSIOTHERAPIST)
+  @Get('notifications/me/unread-count')
+  @ApiOperation({ summary: 'Unread in-app notification count for navbar badge' })
+  getUnreadCount(@Req() req: Request) {
+    return this.notificationsService.getUnreadCount(req.user as AuthUser);
+  }
+
+  @Roles(UserRole.ADMIN, UserRole.PATIENT, UserRole.PHYSIOTHERAPIST)
   @Patch('notifications/:notificationId/read')
   @ApiOperation({ summary: 'Mark one notification as read' })
   markAsRead(
