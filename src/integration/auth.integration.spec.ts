@@ -83,6 +83,7 @@ describe('Core integration (real DB, no service mocks)', () => {
 
   afterAll(async () => {
     await resetDatabase();
+    await prisma.$disconnect();
     await app.close();
   });
 
@@ -254,6 +255,7 @@ describe('Core integration (real DB, no service mocks)', () => {
         role: UserRole.PHYSIOTHERAPIST,
       })
       .expect(201);
+    const therapistToken = (therapistRegisterRes.body as AuthResponse).data.accessToken;
     const therapistUserId = (therapistRegisterRes.body as AuthResponse).data.user.id;
     const therapistProfile = await prisma.physiotherapistProfile.findUnique({
       where: { userId: therapistUserId },
@@ -281,6 +283,12 @@ describe('Core integration (real DB, no service mocks)', () => {
       })
       .expect(201);
     const bookingId = (bookingRes.body as ApiEnvelope<{ id: string }>).data.id;
+
+    await request(app.getHttpServer())
+      .patch(`/bookings/${bookingId}/status`)
+      .set('Authorization', `Bearer ${therapistToken}`)
+      .send({ status: 'CONFIRMED' })
+      .expect(200);
 
     const transactionCreateRes = await request(app.getHttpServer())
       .post('/transactions')
@@ -435,6 +443,12 @@ describe('Core integration (real DB, no service mocks)', () => {
     }>).data;
     expect(booking.slotId).toBe(slotId);
     expect(booking.appointmentDate).toBe('2099-12-30T09:00:00.000Z');
+
+    await request(app.getHttpServer())
+      .patch(`/bookings/${booking.id}/status`)
+      .set('Authorization', `Bearer ${therapistToken}`)
+      .send({ status: 'CONFIRMED' })
+      .expect(200);
 
     const conversationRes = await request(app.getHttpServer())
       .post('/chat/conversations')
@@ -650,6 +664,7 @@ describe('Core integration (real DB, no service mocks)', () => {
         role: UserRole.PHYSIOTHERAPIST,
       })
       .expect(201);
+    const therapistToken = (therapistRegisterRes.body as AuthResponse).data.accessToken;
     const therapistUserId = (therapistRegisterRes.body as AuthResponse).data.user.id;
     const therapistProfile = await prisma.physiotherapistProfile.findUnique({
       where: { userId: therapistUserId },
@@ -677,6 +692,12 @@ describe('Core integration (real DB, no service mocks)', () => {
       })
       .expect(201);
     const bookingId = (bookingRes.body as ApiEnvelope<{ id: string }>).data.id;
+
+    await request(app.getHttpServer())
+      .patch(`/bookings/${bookingId}/status`)
+      .set('Authorization', `Bearer ${therapistToken}`)
+      .send({ status: 'CONFIRMED' })
+      .expect(200);
 
     const transactionCreateRes = await request(app.getHttpServer())
       .post('/transactions')
@@ -1138,6 +1159,8 @@ describe('Core integration (real DB, no service mocks)', () => {
         .set('Authorization', `Bearer ${patientAToken}`)
         .send({
           bookingId,
+          paymentProofUrl:
+            'https://example.com/integration-mock-payment-proof.png',
           paymentMethod: 'BANK_TRANSFER',
         })
         .expect(400);
