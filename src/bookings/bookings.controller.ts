@@ -21,6 +21,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { AuthUser } from '../common/types/auth-user.type';
 import { BookingsService } from './bookings.service';
+import { CalendarBookingsQueryDto } from './dto/calendar-bookings-query.dto';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { CreateConsultationDto } from './dto/create-consultation.dto';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
@@ -78,6 +79,21 @@ export class BookingsController {
   @ApiOperation({ summary: 'Create booking (patient)' })
   createBooking(@Req() req: Request, @Body() dto: CreateBookingDto) {
     return this.bookingsService.createBooking(req.user as AuthUser, dto);
+  }
+
+  @Roles(UserRole.ADMIN, UserRole.PATIENT, UserRole.PHYSIOTHERAPIST)
+  @Get('bookings/calendar')
+  @ApiOperation({
+    summary: 'List bookings in date range for calendar view (current actor)',
+  })
+  listMyBookingsCalendar(
+    @Req() req: Request,
+    @Query() query: CalendarBookingsQueryDto,
+  ) {
+    return this.bookingsService.listMyBookingsCalendar(
+      req.user as AuthUser,
+      query,
+    );
   }
 
   @Roles(UserRole.ADMIN, UserRole.PATIENT, UserRole.PHYSIOTHERAPIST)

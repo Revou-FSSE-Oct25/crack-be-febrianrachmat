@@ -24,6 +24,13 @@ import { PrismaService } from '../prisma/prisma.service';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { AuthUser } from '../common/types/auth-user.type';
 import { consultationSlaWindowMinutes } from './consultation-sla.util';
+import {
+  formatAppointmentWhenId,
+  isWithinReminderWindow,
+  parseReminderHoursBefore,
+  parseReminderWindowMinutes,
+} from './appointment-reminder.helpers';
+import { CalendarBookingsQueryDto } from './dto/calendar-bookings-query.dto';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { CreateConsultationDto } from './dto/create-consultation.dto';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
@@ -448,6 +455,131 @@ export class BookingsService {
     );
 
     return booking;
+  }
+
+  async listMyBookingsCalendar(
+    authUser: AuthUser,
+    query: CalendarBookingsQueryDto,
+  ) {
+    const from = new Date(query.from);
+    const to = new Date(query.to);
+    if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {
+      throw new BadRequestException('from and to must be valid ISO dates.');
+    }
+    if (from > to) {
+      throw new BadRequestException('from must be before to.');
+    }
+    const maxRangeMs = 93 * 24 * 60 * 60 * 1000;
+    if (to.getTime() - from.getTime() > maxRangeMs) {
+      throw new BadRequestException('Calendar range cannot exceed 93 days.');
+    }
+
+    const scope = await this.bookingScopeForUser(authUser);
+    const rows = await this.prisma.booking.findMany({
+      where: {
+        ...scope,
+        appointmentDate: { gte: from, lte: to },
+        status: { not: BookingStatus.CANCELLED },
+      },
+      orderBy: { appointmentDate: 'asc' },
+      include: {
+        patient: {
+          include: {
+            user: { select: { fullName: true } },
+          },
+        },
+        physiotherapist: {
+          include: {
+            user: { select: { fullName: true } },
+          },
+        },
+      },
+    });
+
+    return {
+      from: from.toISOString(),
+      to: to.toISOString(),
+      items: rows.map((row) => this.toCalendarBookingItem(row, authUser.role)),
+    };
+  }
+
+  /**
+   * Sends in-app (and email mock) reminders ~24h before confirmed visits.
+   * Idempotent per booking via `appointmentReminderSentAt`.
+   */
+  async processAppointmentReminders(): Promise<{
+    checked: number;
+    sent: number;
+  }> {
+    const hoursBefore = parseReminderHoursBefore(
+      process.env.APPOINTMENT_REMINDER_HOURS_BEFORE,
+    );
+    const windowMinutes = parseReminderWindowMinutes(
+      process.env.APPOINTMENT_REMINDER_WINDOW_MINUTES,
+    );
+    const now = new Date();
+
+    const candidates = await this.prisma.booking.findMany({
+      where: {
+        status: {
+          in: [BookingStatus.CONFIRMED, BookingStatus.IN_PROGRESS],
+        },
+        appointmentReminderSentAt: null,
+        appointmentDate: { gt: now },
+      },
+      include: {
+        patient: { include: { user: { select: { id: true, fullName: true } } } },
+        physiotherapist: {
+          include: { user: { select: { id: true, fullName: true } } },
+        },
+      },
+    });
+
+    let sent = 0;
+    for (const booking of candidates) {
+      if (
+        !isWithinReminderWindow(
+          booking.appointmentDate,
+          now,
+          hoursBefore,
+          windowMinutes,
+        )
+      ) {
+        continue;
+      }
+
+      const when = formatAppointmentWhenId(booking.appointmentDate);
+      const location =
+        booking.appointmentType === 'HOME_VISIT'
+          ? booking.homeVisitAddress ?? 'Alamat home visit'
+          : booking.clinicAddress ?? 'Alamat klinik';
+      const typeLabel =
+        booking.appointmentType === 'HOME_VISIT'
+          ? 'Home visit'
+          : 'Kunjungan klinik';
+
+      const patientName = booking.patient.user.fullName;
+      const therapistName = booking.physiotherapist.user.fullName;
+
+      await this.safeNotify(
+        booking.patient.user.id,
+        'Pengingat janji temu (H-1)',
+        `Janji ${typeLabel} besok (${when}) dengan ${therapistName}. Lokasi: ${location}.`,
+      );
+      await this.safeNotify(
+        booking.physiotherapist.user.id,
+        'Pengingat janji temu (H-1)',
+        `Janji ${typeLabel} besok (${when}) dengan pasien ${patientName}. Lokasi: ${location}.`,
+      );
+
+      await this.prisma.booking.update({
+        where: { id: booking.id },
+        data: { appointmentReminderSentAt: now },
+      });
+      sent += 1;
+    }
+
+    return { checked: candidates.length, sent };
   }
 
   async listMyBookings(authUser: AuthUser, query: PaginationQueryDto) {
@@ -1097,6 +1229,70 @@ export class BookingsService {
     }
 
     res.sendFile(filePath);
+  }
+
+  private async bookingScopeForUser(
+    authUser: AuthUser,
+  ): Promise<Prisma.BookingWhereInput> {
+    if (authUser.role === UserRole.PATIENT) {
+      const patient = await this.prisma.patientProfile.findUnique({
+        where: { userId: authUser.sub },
+      });
+      if (!patient) {
+        throw new BadRequestException('Patient profile not found.');
+      }
+      return { patientId: patient.id };
+    }
+    if (authUser.role === UserRole.PHYSIOTHERAPIST) {
+      const therapist = await this.prisma.physiotherapistProfile.findUnique({
+        where: { userId: authUser.sub },
+      });
+      if (!therapist) {
+        throw new BadRequestException('Physiotherapist profile not found.');
+      }
+      return { physiotherapistId: therapist.id };
+    }
+    return {};
+  }
+
+  private toCalendarBookingItem(
+    row: {
+      id: string;
+      appointmentDate: Date;
+      appointmentType: string;
+      status: BookingStatus;
+      visitFeeSnapshot: Prisma.Decimal;
+      clinicAddress: string | null;
+      homeVisitAddress: string | null;
+      notes: string | null;
+      patient: { user: { fullName: string } };
+      physiotherapist: { user: { fullName: string } };
+    },
+    role: UserRole,
+  ) {
+    const locationLabel =
+      row.appointmentType === 'HOME_VISIT'
+        ? row.homeVisitAddress ?? 'Home visit'
+        : row.clinicAddress ?? 'Klinik';
+    const counterpartyName =
+      role === UserRole.PHYSIOTHERAPIST
+        ? row.patient.user.fullName
+        : role === UserRole.PATIENT
+          ? row.physiotherapist.user.fullName
+          : `${row.patient.user.fullName} · ${row.physiotherapist.user.fullName}`;
+
+    return {
+      id: row.id,
+      appointmentDate: row.appointmentDate.toISOString(),
+      appointmentType: row.appointmentType,
+      status: row.status,
+      visitFeeSnapshot: row.visitFeeSnapshot.toString(),
+      clinicAddress: row.clinicAddress,
+      homeVisitAddress: row.homeVisitAddress,
+      notes: row.notes,
+      counterpartyName,
+      locationLabel,
+    };
   }
 
   private async safeNotify(

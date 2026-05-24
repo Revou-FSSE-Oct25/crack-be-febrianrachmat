@@ -271,6 +271,8 @@ model Booking {
   homeVisitAddress    String?
   notes               String?
   status              BookingStatus @default(PENDING)
+  /// Set when H-1 (default 24h) in-app reminder was sent to patient and therapist.
+  appointmentReminderSentAt DateTime?
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 

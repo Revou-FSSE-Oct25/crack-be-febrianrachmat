@@ -14,6 +14,7 @@ jobs:
       JWT_SECRET: ci-test-jwt-secret-min-32-chars-long
       DISABLE_THROTTLE: "true"
       CONSULTATION_SLA_CRON: "false"
+      APPOINTMENT_REMINDER_CRON: "false"
 
     steps:
       - uses: actions/checkout@v4
