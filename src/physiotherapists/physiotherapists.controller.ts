@@ -66,7 +66,7 @@ export class PhysiotherapistsController {
     return this.physiotherapistsService.getApprovedById(profileId);
   }
 
-  @Roles(UserRole.PATIENT, UserRole.ADMIN)
+  @Roles(UserRole.PATIENT, UserRole.ADMIN, UserRole.PHYSIOTHERAPIST)
   @Get('physiotherapists')
   @ApiOperation({ summary: 'Browse approved physiotherapists' })
   browseApproved(@Query() query: BrowsePhysiotherapistsQueryDto) {

@@ -1,6 +1,7 @@
 import { Transform, Type } from 'class-transformer';
 import {
   IsBoolean,
+  IsIn,
   IsInt,
   IsOptional,
   IsString,
@@ -8,6 +9,7 @@ import {
   Max,
   Min,
 } from 'class-validator';
+import { BROWSE_SORT_VALUES } from '../browse.helpers';
 
 export class BrowsePhysiotherapistsQueryDto {
   @IsOptional()
@@ -36,6 +38,18 @@ export class BrowsePhysiotherapistsQueryDto {
   })
   @IsBoolean()
   onlineNow?: boolean;
+
+  /** Minimum average star rating (1–5) from visible reviews. */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(5)
+  minRating?: number;
+
+  @IsOptional()
+  @IsIn([...BROWSE_SORT_VALUES])
+  sort?: (typeof BROWSE_SORT_VALUES)[number];
 
   @IsOptional()
   @Type(() => Number)
