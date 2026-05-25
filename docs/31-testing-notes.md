@@ -13,7 +13,7 @@ Quick map of automated test coverage currently available in this repository.
 - Both stages, sequentially: `npm run test:all`
 - Unit test coverage report: `npm run test:cov`
 - Seed demo data locally: `npm run prisma:seed`
-- **CI (GitHub Actions):** push/PR ke `main` menjalankan `npm run test:cov` + `npm run build` (lihat [`32-operations-runbook.md`](./32-operations-runbook.md)).
+- **CI (GitHub Actions):** push/PR ke `main` menjalankan `npm run test:cov` → `prisma migrate deploy` + `npm run test:integration` (Postgres service container) → `npm run build` (lihat [`32-operations-runbook.md`](./32-operations-runbook.md)).
   - Ringkasan % coverage muncul di **job summary** GitHub Actions.
   - Artefak `coverage-report` (`lcov.info`, `coverage-summary.json`) tersedia untuk diunduh dari run CI.
 

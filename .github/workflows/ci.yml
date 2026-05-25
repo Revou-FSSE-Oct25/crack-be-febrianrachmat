@@ -9,8 +9,25 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: crack_integration_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d crack_integration_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     env:
-      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ci_placeholder?schema=public
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/crack_integration_test?schema=public
+      TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/crack_integration_test?schema=public
       JWT_SECRET: ci-test-jwt-secret-min-32-chars-long
       DISABLE_THROTTLE: "true"
       CONSULTATION_SLA_CRON: "false"
@@ -30,6 +47,9 @@ jobs:
       - name: Prisma generate
         run: npx prisma generate
 
+      - name: Apply database migrations
+        run: npx prisma migrate deploy
+
       - name: Unit tests with coverage
         run: npm run test:cov
 
@@ -46,6 +66,9 @@ jobs:
             coverage/lcov.info
             coverage/coverage-summary.json
           retention-days: 14
+
+      - name: Integration tests (real Postgres)
+        run: npm run test:integration
 
       - name: Build
         run: npm run build

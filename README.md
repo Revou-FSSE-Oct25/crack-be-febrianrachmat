@@ -127,7 +127,7 @@ Salin `.env.example` → `.env`. Variabel penting:
 
 For a coverage map, what each suite asserts, and how CI publishes coverage summaries, see [`docs/31-testing-notes.md`](./docs/31-testing-notes.md).
 
-**CI:** setiap push/PR ke `main` menjalankan `test:cov` dan memposting tabel coverage di GitHub Actions job summary (artefak `coverage-report` untuk unduhan).
+**CI:** setiap push/PR ke `main` menjalankan `test:cov`, `test:integration` (Postgres service di GitHub Actions), `build`, dan memposting tabel coverage di job summary (artefak `coverage-report` untuk unduhan).
 
 ## Deployment (Railway)
 

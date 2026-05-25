@@ -46,6 +46,8 @@ describe('Core integration (real DB, no service mocks)', () => {
         "Consultation",
         "AvailabilitySlot",
         "Notification",
+        "AuditLog",
+        "OAuthAccount",
         "PhysiotherapistProfile",
         "PatientProfile",
         "Category",

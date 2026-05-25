@@ -75,9 +75,9 @@ npm run prisma:seed
 | `npm run test:all` | Keduanya | Unit lalu integrasi. |
 | `npm run build` | TypeScript compile | Wajib sukses sebelum deploy. |
 
-**GitHub Actions** (`.github/workflows/ci.yml`): `npm ci` → `prisma generate` → `npm run test:cov` → ringkasan coverage di job summary + artefak `coverage-report` → `npm run build` pada setiap push/PR ke `main`. Integrasi DB **tidak** dijalankan di CI (butuh Postgres service); jalankan `test:integration` lokal sebelum submit besar.
+**GitHub Actions** (`.github/workflows/ci.yml`): `npm ci` → `prisma generate` → `prisma migrate deploy` (Postgres 16 service `crack_integration_test`) → `npm run test:cov` → ringkasan coverage + artefak `coverage-report` → `npm run test:integration` → `npm run build` pada setiap push/PR ke `main`.
 
-Env CI: `DISABLE_THROTTLE=true`, `CONSULTATION_SLA_CRON=false`, placeholder `DATABASE_URL`.
+Env CI: `DATABASE_URL` / `TEST_DATABASE_URL` ke Postgres service, `DISABLE_THROTTLE=true`, `CONSULTATION_SLA_CRON=false`, `APPOINTMENT_REMINDER_CRON=false`.
 
 ---
 
