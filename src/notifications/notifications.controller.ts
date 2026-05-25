@@ -55,16 +55,24 @@ export class NotificationsController {
   @Post('admin/notifications/users/:userId')
   @ApiOperation({ summary: 'Send notification to one user (admin)' })
   sendToUser(
+    @Req() req: Request,
     @Param('userId') userId: string,
     @Body() dto: CreateNotificationDto,
   ) {
-    return this.notificationsService.sendToUser(userId, dto);
+    return this.notificationsService.sendToUser(
+      req.user as AuthUser,
+      userId,
+      dto,
+    );
   }
 
   @Roles(UserRole.ADMIN)
   @Post('admin/notifications/broadcast')
   @ApiOperation({ summary: 'Broadcast notification to all active users (admin)' })
-  broadcastToAll(@Body() dto: CreateNotificationDto) {
-    return this.notificationsService.broadcastToAllUsers(dto);
+  broadcastToAll(@Req() req: Request, @Body() dto: CreateNotificationDto) {
+    return this.notificationsService.broadcastToAllUsers(
+      req.user as AuthUser,
+      dto,
+    );
   }
 }

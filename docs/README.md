@@ -51,6 +51,7 @@ One file per domain module. Each file lists endpoints, payloads, validation rule
 | [`17-review-analytics-feature.md`](./17-review-analytics-feature.md) | Reviews + admin moderation + dashboard analytics | All roles |
 | [`18-notification-feature.md`](./18-notification-feature.md) | Notifications CRUD (`/notifications/*`, admin send/broadcast) | All roles |
 | [`19-notification-automation-feature.md`](./19-notification-automation-feature.md) | Automated system notifications wired into business events | Internal |
+| [`20-audit-log-feature.md`](./20-audit-log-feature.md) | Persisted audit logs (`/admin/audit-logs`) for admin/system actions | Admin read |
 
 ## 3x. Quality
 

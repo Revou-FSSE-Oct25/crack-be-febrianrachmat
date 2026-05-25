@@ -54,7 +54,7 @@ Hak akses mengikuti **JWT + RBAC**; kepemilikan resource (mis. booking milik pas
 ## 6. Konfirmasi admin dan refund manual
 
 - Hanya **admin** yang dapat mengonfirmasi pembayaran dummy (`PAID`) atau melakukan **refund** pada transaksi yang memenuhi syarat status.
-- Aksi admin penting dicatat dalam **log audit terstruktur** (JSON) di server untuk keperluan operasional demo, bukan pengadilan.
+- Aksi admin penting dicatat dalam tabel **`AuditLog`** di database (dan tetap bisa dilacak lewat `GET /admin/audit-logs`) untuk keperluan operasional demo, bukan pengadilan.
 
 ---
 

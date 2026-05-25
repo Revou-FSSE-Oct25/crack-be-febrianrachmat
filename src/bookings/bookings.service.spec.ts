@@ -46,10 +46,14 @@ describe('BookingsService', () => {
   const configMock = {
     get: jest.fn().mockReturnValue(undefined),
   };
+  const auditMock = {
+    record: jest.fn().mockResolvedValue(undefined),
+  };
   const service = new BookingsService(
     prismaMock as never,
     notificationsMock as never,
     configMock as never,
+    auditMock as never,
   );
   const PATIENT_USER = {
     sub: 'patient-user-1',

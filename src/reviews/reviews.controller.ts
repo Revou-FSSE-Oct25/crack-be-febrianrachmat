@@ -81,9 +81,14 @@ export class ReviewsController {
   @Patch('admin/reviews/:reviewId/moderate')
   @ApiOperation({ summary: 'Moderate review visibility (admin)' })
   moderateReview(
+    @Req() req: Request,
     @Param('reviewId') reviewId: string,
     @Body() dto: ModerateReviewDto,
   ) {
-    return this.reviewsService.moderateReview(reviewId, dto);
+    return this.reviewsService.moderateReview(
+      req.user as AuthUser,
+      reviewId,
+      dto,
+    );
   }
 }

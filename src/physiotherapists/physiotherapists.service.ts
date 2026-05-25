@@ -4,10 +4,13 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
+  AuditAction,
+  AuditEntityType,
   Prisma,
   TherapistVerificationStatus,
   UserRole,
 } from '@prisma/client';
+import { AuditService } from '../audit/audit.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthUser } from '../common/types/auth-user.type';
@@ -38,6 +41,7 @@ export class PhysiotherapistsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notificationsService: NotificationsService,
+    private readonly auditService: AuditService,
   ) {}
 
   /**
@@ -300,7 +304,11 @@ export class PhysiotherapistsService {
     });
   }
 
-  async verifyByAdmin(profileId: string, dto: VerifyPhysiotherapistDto) {
+  async verifyByAdmin(
+    authUser: AuthUser,
+    profileId: string,
+    dto: VerifyPhysiotherapistDto,
+  ) {
     if (
       dto.status === TherapistVerificationStatus.REJECTED &&
       !dto.rejectionReason
@@ -352,6 +360,18 @@ export class PhysiotherapistsService {
         ? 'Your physiotherapist profile has been approved by admin.'
         : `Your profile was rejected. Reason: ${dto.rejectionReason ?? 'N/A'}`,
     );
+
+    await this.auditService.record({
+      action: AuditAction.PHYSIOTHERAPIST_VERIFY,
+      entityType: AuditEntityType.PHYSIOTHERAPIST,
+      entityId: profileId,
+      actor: authUser,
+      metadata: {
+        status: dto.status,
+        rejectionReason: dto.rejectionReason ?? null,
+        therapistUserId: updated.user.id,
+      },
+    });
 
     return updated;
   }

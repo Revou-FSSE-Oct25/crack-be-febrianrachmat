@@ -23,15 +23,24 @@ describe('NotificationsService', () => {
   const emailMockMock = {
     sendNotificationEmail: jest.fn().mockResolvedValue(undefined),
   };
+  const auditMock = {
+    record: jest.fn().mockResolvedValue(undefined),
+  };
 
   const service = new NotificationsService(
     prismaMock as never,
     emailMockMock as never,
+    auditMock as never,
   );
   const PATIENT_USER = {
     sub: 'user-1',
     email: 'u@mail.com',
     role: UserRole.PATIENT,
+  };
+  const ADMIN_USER = {
+    sub: 'admin-1',
+    email: 'a@mail.com',
+    role: UserRole.ADMIN,
   };
 
   beforeEach(() => {
@@ -103,7 +112,7 @@ describe('NotificationsService', () => {
     prismaMock.user.findUnique.mockResolvedValue(null);
 
     await expect(
-      service.sendToUser('missing-user', {
+      service.sendToUser(ADMIN_USER, 'missing-user', {
         title: 'A',
         body: 'B',
       }),
@@ -113,7 +122,7 @@ describe('NotificationsService', () => {
   it('broadcastToAllUsers returns zero when no active users', async () => {
     prismaMock.user.findMany.mockResolvedValue([]);
 
-    const result = await service.broadcastToAllUsers({
+    const result = await service.broadcastToAllUsers(ADMIN_USER, {
       title: 'Info',
       body: 'Body',
     });
@@ -130,7 +139,7 @@ describe('NotificationsService', () => {
       .mockResolvedValueOnce({ id: 'n1', userId: 'u1' })
       .mockResolvedValueOnce({ id: 'n2', userId: 'u2' });
 
-    const result = await service.broadcastToAllUsers({
+    const result = await service.broadcastToAllUsers(ADMIN_USER, {
       title: 'Promo',
       body: 'Diskon',
     });

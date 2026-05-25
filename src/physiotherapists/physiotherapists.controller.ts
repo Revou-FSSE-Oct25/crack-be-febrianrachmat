@@ -84,9 +84,14 @@ export class PhysiotherapistsController {
   @Patch('admin/physiotherapists/:profileId/verify')
   @ApiOperation({ summary: 'Verify physiotherapist profile (admin)' })
   verify(
+    @Req() req: Request,
     @Param('profileId') profileId: string,
     @Body() dto: VerifyPhysiotherapistDto,
   ) {
-    return this.physiotherapistsService.verifyByAdmin(profileId, dto);
+    return this.physiotherapistsService.verifyByAdmin(
+      req.user as AuthUser,
+      profileId,
+      dto,
+    );
   }
 }

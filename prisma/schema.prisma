@@ -67,6 +67,26 @@ enum OAuthProvider {
   FACEBOOK
 }
 
+/// Persisted audit trail for sensitive admin and system actions.
+enum AuditAction {
+  TRANSACTION_MARK_PAID
+  TRANSACTION_REFUND
+  TRANSACTION_SLA_AUTO_REFUND
+  REVIEW_MODERATE
+  PHYSIOTHERAPIST_VERIFY
+  NOTIFICATION_BROADCAST
+  NOTIFICATION_SEND_USER
+}
+
+enum AuditEntityType {
+  TRANSACTION
+  BOOKING
+  CONSULTATION
+  REVIEW
+  PHYSIOTHERAPIST
+  USER
+}
+
 model User {
   /// Shared identity table for all roles (admin, patient, physiotherapist).
   id            String      @id @default(uuid())
@@ -88,6 +108,7 @@ model User {
   notifications         Notification[]
   sentMessages          Message[]
   conversationMembers   ConversationParticipant[]
+  auditLogs             AuditLog[]
 }
 
 model OAuthAccount {
@@ -353,4 +374,22 @@ model Notification {
   user        User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, isRead])
+}
+
+model AuditLog {
+  /// Immutable record of admin/system actions for operational traceability.
+  id          String          @id @default(uuid())
+  action      AuditAction
+  actorUserId String?
+  actorRole   UserRole?
+  entityType  AuditEntityType
+  entityId    String
+  metadata    Json?
+  createdAt   DateTime        @default(now())
+
+  actor       User?           @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([action, createdAt])
+  @@index([entityType, entityId])
+  @@index([actorUserId, createdAt])
 }

@@ -18,7 +18,13 @@ describe('NotificationsController', () => {
     email: 'u@mail.com',
     role: UserRole.PATIENT,
   };
+  const ADMIN_USER = {
+    sub: 'admin-1',
+    email: 'a@mail.com',
+    role: UserRole.ADMIN,
+  };
   const REQ = { user: PATIENT_USER };
+  const ADMIN_REQ = { user: ADMIN_USER };
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -63,9 +69,10 @@ describe('NotificationsController', () => {
     const dto = { title: 'Info', body: 'Body' };
     notificationsServiceMock.sendToUser.mockResolvedValue({ id: 'n1' });
 
-    await controller.sendToUser('user-2', dto);
+    await controller.sendToUser(ADMIN_REQ as never, 'user-2', dto);
 
     expect(notificationsServiceMock.sendToUser).toHaveBeenCalledWith(
+      ADMIN_USER,
       'user-2',
       dto,
     );
@@ -77,9 +84,10 @@ describe('NotificationsController', () => {
       createdCount: 2,
     });
 
-    await controller.broadcastToAll(dto);
+    await controller.broadcastToAll(ADMIN_REQ as never, dto);
 
     expect(notificationsServiceMock.broadcastToAllUsers).toHaveBeenCalledWith(
+      ADMIN_USER,
       dto,
     );
   });

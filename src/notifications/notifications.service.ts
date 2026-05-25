@@ -1,4 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { AuditAction, AuditEntityType } from '@prisma/client';
+import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { AuthUser } from '../common/types/auth-user.type';
@@ -10,6 +12,7 @@ export class NotificationsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly emailMock: EmailMockService,
+    private readonly auditService: AuditService,
   ) {}
 
   async listMyNotifications(authUser: AuthUser, query: PaginationQueryDto) {
@@ -69,20 +72,38 @@ export class NotificationsService {
     };
   }
 
-  async sendToUser(userId: string, dto: CreateNotificationDto) {
+  async sendToUser(
+    actor: AuthUser,
+    userId: string,
+    dto: CreateNotificationDto,
+  ) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) {
       throw new BadRequestException('Target user does not exist.');
     }
 
-    return this.dispatchNotification(userId, dto.title, dto.body);
+    const notification = await this.dispatchNotification(
+      userId,
+      dto.title,
+      dto.body,
+    );
+
+    await this.auditService.record({
+      action: AuditAction.NOTIFICATION_SEND_USER,
+      entityType: AuditEntityType.USER,
+      entityId: userId,
+      actor,
+      metadata: { title: dto.title, notificationId: notification.id },
+    });
+
+    return notification;
   }
 
   async createSystemNotification(userId: string, title: string, body: string) {
     return this.dispatchNotification(userId, title, body);
   }
 
-  async broadcastToAllUsers(dto: CreateNotificationDto) {
+  async broadcastToAllUsers(actor: AuthUser, dto: CreateNotificationDto) {
     const users = await this.prisma.user.findMany({
       where: { isActive: true },
       select: { id: true },
@@ -97,6 +118,17 @@ export class NotificationsService {
         this.dispatchNotification(user.id, dto.title, dto.body),
       ),
     );
+
+    await this.auditService.record({
+      action: AuditAction.NOTIFICATION_BROADCAST,
+      entityType: AuditEntityType.USER,
+      entityId: 'broadcast',
+      actor,
+      metadata: {
+        title: dto.title,
+        createdCount: notifications.length,
+      },
+    });
 
     return {
       message: 'Broadcast notification sent.',

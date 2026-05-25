@@ -11,6 +11,8 @@ import type { Response } from 'express';
 import { ConfigService } from '@nestjs/config';
 import {
   AppointmentType,
+  AuditAction,
+  AuditEntityType,
   BookingStatus,
   ConsultationSlaTier,
   ConsultationStatus,
@@ -19,6 +21,7 @@ import {
   TransactionStatus,
   UserRole,
 } from '@prisma/client';
+import { AuditService } from '../audit/audit.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
@@ -82,6 +85,7 @@ export class BookingsService {
     private readonly prisma: PrismaService,
     private readonly notificationsService: NotificationsService,
     private readonly configService: ConfigService,
+    private readonly auditService: AuditService,
   ) {}
 
   async createConsultation(authUser: AuthUser, dto: CreateConsultationDto) {
@@ -962,17 +966,20 @@ export class BookingsService {
       );
     }
 
-    this.logger.log(
-      JSON.stringify({
-        type: 'audit.transaction_mark_paid',
-        transactionId,
-        adminUserId: actor?.sub ?? 'unknown',
+    await this.auditService.record({
+      action: AuditAction.TRANSACTION_MARK_PAID,
+      entityType: AuditEntityType.TRANSACTION,
+      entityId: transactionId,
+      actor: actor ?? null,
+      metadata: {
         patientId: transaction.patientId,
+        bookingId: transaction.bookingId,
+        consultationId: transaction.consultationId,
         ...(transaction.amount != null
           ? { amount: transaction.amount.toString() }
           : {}),
-      }),
-    );
+      },
+    });
 
     return updated;
   }
@@ -981,6 +988,7 @@ export class BookingsService {
     transactionId: string,
     dto: RefundTransactionDto,
     actor?: AuthUser,
+    auditAction: AuditAction = AuditAction.TRANSACTION_REFUND,
   ) {
     const transaction = await this.prisma.transaction.findUnique({
       where: { id: transactionId },
@@ -1046,18 +1054,21 @@ export class BookingsService {
       );
     }
 
-    this.logger.log(
-      JSON.stringify({
-        type: 'audit.transaction_refund',
-        transactionId,
-        adminUserId: actor?.sub ?? 'system',
+    await this.auditService.record({
+      action: auditAction,
+      entityType: AuditEntityType.TRANSACTION,
+      entityId: transactionId,
+      actor: actor ?? null,
+      metadata: {
         reason: dto.reason,
         patientId: transaction.patientId,
+        consultationId: transaction.consultationId,
+        bookingId: transaction.bookingId,
         ...(transaction.amount != null
           ? { amount: transaction.amount.toString() }
           : {}),
-      }),
-    );
+      },
+    });
 
     return updated;
   }
@@ -1133,9 +1144,14 @@ export class BookingsService {
           : `${Math.round(slaMinutes / 60)} jam (standar)`;
 
       try {
-        await this.refundTransactionByAdmin(tx.id, {
-          reason: `Pengembalian otomatis: tidak ada balasan terapis dalam batas ${label}.`,
-        });
+        await this.refundTransactionByAdmin(
+          tx.id,
+          {
+            reason: `Pengembalian otomatis: tidak ada balasan terapis dalam batas ${label}.`,
+          },
+          undefined,
+          AuditAction.TRANSACTION_SLA_AUTO_REFUND,
+        );
         refunded += 1;
       } catch (err) {
         this.logger.warn(
