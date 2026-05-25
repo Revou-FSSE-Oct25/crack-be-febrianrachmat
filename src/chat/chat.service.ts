@@ -4,12 +4,16 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { MessageEvent } from '@nestjs/common/interfaces';
 import { ConsultationStatus, Prisma, UserRole } from '@prisma/client';
+import { Observable } from 'rxjs';
 import { PrismaService } from '../prisma/prisma.service';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { AuthUser } from '../common/types/auth-user.type';
+import { parseChatSsePollMs, parseSinceCursor } from './chat-sse.util';
 import { CreateOrGetConversationDto } from './dto/create-or-get-conversation.dto';
 import { SendMessageDto } from './dto/send-message.dto';
+import { StreamMessagesQueryDto } from './dto/stream-messages-query.dto';
 
 /**
  * Phase 1 pay-first rule of thumb:
@@ -163,6 +167,84 @@ export class ChatService {
       include: {
         sender: { select: { id: true, fullName: true, email: true, role: true } },
       },
+    });
+  }
+
+  /**
+   * Server-Sent Events stream: polls for messages newer than `query.since`.
+   * Same read access as GET messages (history visible even when chat is locked).
+   */
+  streamMessages(
+    authUser: AuthUser,
+    conversationId: string,
+    query: StreamMessagesQueryDto,
+  ): Observable<MessageEvent> {
+    const pollMs = parseChatSsePollMs(process.env.CHAT_SSE_POLL_MS);
+    let cursor = parseSinceCursor(query.since);
+
+    return new Observable<MessageEvent>((subscriber) => {
+      let active = true;
+      let timer: ReturnType<typeof setInterval> | undefined;
+      let pingTimer: ReturnType<typeof setInterval> | undefined;
+
+      const tick = async (): Promise<void> => {
+        if (!active) {
+          return;
+        }
+        try {
+          await this.assertCanAccessConversation(authUser, conversationId);
+
+          const rows = await this.prisma.message.findMany({
+            where: {
+              conversationId,
+              createdAt: { gt: cursor },
+            },
+            orderBy: { createdAt: 'asc' },
+            take: 50,
+            include: {
+              sender: {
+                select: {
+                  id: true,
+                  fullName: true,
+                  email: true,
+                  role: true,
+                },
+              },
+            },
+          });
+
+          for (const row of rows) {
+            if (!active) {
+              return;
+            }
+            subscriber.next({ id: row.id, data: row });
+            cursor = row.createdAt;
+          }
+        } catch (err) {
+          if (active) {
+            subscriber.error(err);
+          }
+          active = false;
+        }
+      };
+
+      void tick();
+      timer = setInterval(() => void tick(), pollMs);
+      pingTimer = setInterval(() => {
+        if (active) {
+          subscriber.next({ type: 'ping', data: '' });
+        }
+      }, 30_000);
+
+      return () => {
+        active = false;
+        if (timer) {
+          clearInterval(timer);
+        }
+        if (pingTimer) {
+          clearInterval(pingTimer);
+        }
+      };
     });
   }
 

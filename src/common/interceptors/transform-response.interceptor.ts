@@ -4,8 +4,10 @@ import {
   Injectable,
   NestInterceptor,
 } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
+import { SKIP_ENVELOPE_KEY } from '../decorators/skip-envelope.decorator';
 import { PaginationMeta } from '../types/api-response.types';
 
 /**
@@ -50,7 +52,17 @@ function isAlreadyWrapped(value: unknown): boolean {
 
 @Injectable()
 export class TransformResponseInterceptor implements NestInterceptor {
-  intercept(_context: ExecutionContext, next: CallHandler): Observable<unknown> {
+  constructor(private readonly reflector: Reflector) {}
+
+  intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
+    const skipEnvelope = this.reflector.getAllAndOverride<boolean>(
+      SKIP_ENVELOPE_KEY,
+      [context.getHandler(), context.getClass()],
+    );
+    if (skipEnvelope) {
+      return next.handle();
+    }
+
     return next.handle().pipe(
       map((data: unknown) => {
         if (isAlreadyWrapped(data)) {

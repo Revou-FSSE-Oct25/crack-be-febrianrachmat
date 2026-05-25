@@ -1,13 +1,27 @@
-import { Body, Controller, Get, Param, Post, Query, Req } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  Body,
+  Controller,
+  Get,
+  Header,
+  MessageEvent,
+  Param,
+  Post,
+  Query,
+  Req,
+  Sse,
+} from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiProduces, ApiTags } from '@nestjs/swagger';
 import { UserRole } from '@prisma/client';
 import { Request } from 'express';
+import { Observable } from 'rxjs';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { SkipEnvelope } from '../common/decorators/skip-envelope.decorator';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { AuthUser } from '../common/types/auth-user.type';
 import { ChatService } from './chat.service';
 import { CreateOrGetConversationDto } from './dto/create-or-get-conversation.dto';
 import { SendMessageDto } from './dto/send-message.dto';
+import { StreamMessagesQueryDto } from './dto/stream-messages-query.dto';
 
 @ApiTags('Chat')
 @ApiBearerAuth('access-token')
@@ -30,6 +44,30 @@ export class ChatController {
   @ApiOperation({ summary: 'List conversations by current actor' })
   listMyConversations(@Req() req: Request, @Query() query: PaginationQueryDto) {
     return this.chatService.listMyConversations(req.user as AuthUser, query);
+  }
+
+  @Roles(UserRole.ADMIN, UserRole.PATIENT, UserRole.PHYSIOTHERAPIST)
+  @SkipEnvelope()
+  @Sse('conversations/:conversationId/messages/stream')
+  @Header('Cache-Control', 'no-cache')
+  @Header('Connection', 'keep-alive')
+  @Header('X-Accel-Buffering', 'no')
+  @ApiProduces('text/event-stream')
+  @ApiOperation({
+    summary: 'Stream new messages (SSE)',
+    description:
+      'Long-lived `text/event-stream`. Pass `since` (ISO) for the newest message already on the client. Events: default `message` with JSON body; `ping` keep-alive every 30s.',
+  })
+  streamMessages(
+    @Req() req: Request,
+    @Param('conversationId') conversationId: string,
+    @Query() query: StreamMessagesQueryDto,
+  ): Observable<MessageEvent> {
+    return this.chatService.streamMessages(
+      req.user as AuthUser,
+      conversationId,
+      query,
+    );
   }
 
   @Roles(UserRole.ADMIN, UserRole.PATIENT, UserRole.PHYSIOTHERAPIST)

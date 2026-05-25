@@ -7,7 +7,6 @@ import { AppModule } from '../app.module';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { GlobalExceptionFilter } from '../common/filters/global-exception.filter';
-import { TransformResponseInterceptor } from '../common/interceptors/transform-response.interceptor';
 import { PrismaService } from '../prisma/prisma.service';
 
 type AuthResponse = {
@@ -70,7 +69,6 @@ describe('Core integration (real DB, no service mocks)', () => {
       }),
     );
     app.useGlobalFilters(new GlobalExceptionFilter());
-    app.useGlobalInterceptors(new TransformResponseInterceptor());
     const reflector = app.get(Reflector);
     app.useGlobalGuards(new JwtAuthGuard(reflector), new RolesGuard(reflector));
     await app.init();
