@@ -88,10 +88,20 @@ Request:
 Returns key overview metrics:
 - users total / by role
 - therapist verification counts
-- bookings total / by status
-- transactions by status
-- total paid revenue and total refund amount
-- review total and hidden count
+- bookings and consultations total / by status
+- transactions by status, paid revenue, refund total
+- reviews: total, visible, hidden, average rating, distribution, by source (booking vs consultation)
+- audit log total count
+
+### `GET /admin/dashboard/analytics?days=30` (Role: `ADMIN`)
+
+Extended analytics for charts (7–90 days, default 30):
+
+- daily trends: new users, bookings, consultations, paid revenue
+- review distribution and average rating
+- payment mix (booking vs consultation PAID counts and revenue)
+- top 5 therapists by average visible review rating
+- audit log entries in the selected period
 
 ## Database relations involved
 
