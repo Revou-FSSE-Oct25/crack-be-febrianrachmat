@@ -1,9 +1,22 @@
 import { Type } from 'class-transformer';
-import { IsInt, IsOptional, IsString, IsUUID, Max, Min } from 'class-validator';
+import {
+  IsInt,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Max,
+  Min,
+} from 'class-validator';
 
 export class CreateReviewDto {
+  /** Exactly one of bookingId or consultationId is required (validated in service). */
+  @IsOptional()
   @IsUUID()
-  bookingId!: string;
+  bookingId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  consultationId?: string;
 
   @Type(() => Number)
   @IsInt()

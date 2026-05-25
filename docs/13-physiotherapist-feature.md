@@ -72,6 +72,12 @@ Response shape:
 Each item includes `onlineUntil` when set (ISO timestamp). Clients can treat
 `onlineUntil > now()` as a green "online" badge.
 
+Each browse item and `GET /physiotherapists/:profileId` also include:
+- `averageRating` (number or `null`) — mean of visible reviews (1 decimal)
+- `reviewCount` (number) — count of visible reviews
+
+Sort/filter: `sort=rating_desc|rating_asc`, `minRating=1..5` (see browse query DTO).
+
 ### Admin Verification Endpoints
 
 #### `GET /admin/physiotherapists/pending` (Role: `ADMIN`)

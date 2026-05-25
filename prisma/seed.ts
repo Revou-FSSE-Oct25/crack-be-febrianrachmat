@@ -19,6 +19,7 @@ const DEMO = {
   consultRequested: 'a1000001-0001-4001-8001-000000000001',
   consultAccepted: 'a1000002-0001-4001-8001-000000000002',
   consultInProgress: 'a1000003-0001-4001-8001-000000000003',
+  consultCompleted: 'a1000004-0001-4001-8001-000000000004',
   conversation: 'c3000001-0003-4003-8003-000000000001',
   bookingPending: 'b2000001-0002-4002-8002-000000000001',
   bookingCompleted: 'b2000002-0002-4002-8002-000000000002',
@@ -470,6 +471,31 @@ async function main(): Promise<void> {
     },
   });
 
+  await prisma.consultation.upsert({
+    where: { id: DEMO.consultCompleted },
+    create: {
+      id: DEMO.consultCompleted,
+      patientId: patientProfile1.id,
+      physiotherapistId: physioProfile1.id,
+      complaint: 'DEMO: Nyeri pergelangan — konsultasi online selesai, siap diulas.',
+      status: ConsultationStatus.COMPLETED,
+      feeSnapshot: physioProfile1.consultationFee,
+      acceptedAt: completedAt,
+      startedAt: completedAt,
+      completedAt: completedAt,
+    },
+    update: {
+      patientId: patientProfile1.id,
+      physiotherapistId: physioProfile1.id,
+      complaint: 'DEMO: Nyeri pergelangan — konsultasi online selesai, siap diulas.',
+      status: ConsultationStatus.COMPLETED,
+      feeSnapshot: physioProfile1.consultationFee,
+      acceptedAt: completedAt,
+      startedAt: completedAt,
+      completedAt: completedAt,
+    },
+  });
+
   await prisma.booking.upsert({
     where: { id: DEMO.bookingCompleted },
     create: {
@@ -612,7 +638,7 @@ async function main(): Promise<void> {
   // eslint-disable-next-line no-console
   console.log('- admin@demo.local (ADMIN)');
   // eslint-disable-next-line no-console
-  console.log('- patient1@demo.local (PATIENT) — IN_PROGRESS consult + completed booking/review');
+  console.log('- patient1@demo.local (PATIENT) — IN_PROGRESS consult + completed booking/review + completed consult (ulasan)');
   // eslint-disable-next-line no-console
   console.log('- patient2@demo.local (PATIENT) — ACCEPTED consult + pending booking/tx');
   // eslint-disable-next-line no-console

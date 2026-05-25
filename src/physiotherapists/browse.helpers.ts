@@ -1,5 +1,11 @@
 import { Prisma } from '@prisma/client';
 
+/** Visible reviews used to compute averageRating / reviewCount on profiles. */
+export const profileReviewStatsInclude = {
+  where: { isHidden: false },
+  select: { rating: true },
+} satisfies Prisma.ReviewFindManyArgs;
+
 export const BROWSE_SORT_VALUES = [
   'newest',
   'name_asc',

@@ -16,14 +16,15 @@ This step adds:
 All endpoints require JWT.
 
 ### `POST /reviews` (Role: `PATIENT`)
-Create review for own completed booking.
+Create review for own completed **booking** or **consultation**.
 
 Rules:
-- booking must belong to patient
-- booking status must be `COMPLETED`
-- only one review per booking per patient
+- send exactly one of `bookingId` or `consultationId`
+- target must belong to patient
+- booking status must be `COMPLETED`, or consultation status must be `COMPLETED`
+- only one review per booking or per consultation per patient
 
-Request:
+Booking request:
 
 ```json
 {
@@ -33,11 +34,37 @@ Request:
 }
 ```
 
+Consultation request:
+
+```json
+{
+  "consultationId": "uuid-consultation",
+  "rating": 5,
+  "comment": "Konsultasi online sangat jelas dan responsif."
+}
+```
+
+Responses include `sourceType`: `BOOKING` or `CONSULTATION`.
+
 ### `GET /reviews/me` (Roles: `ADMIN`, `PATIENT`, `PHYSIOTHERAPIST`)
 List reviews based on current user scope.
 
 ### `GET /physiotherapists/:physiotherapistId/reviews` (Roles: `ADMIN`, `PATIENT`, `PHYSIOTHERAPIST`)
 List public reviews (`isHidden = false`) for selected therapist.
+
+### `PATCH /reviews/:reviewId` (Role: `PATIENT`)
+Update own review. At least one of `rating` or `comment` must be sent.
+
+Request:
+
+```json
+{
+  "rating": 4,
+  "comment": "Sesi kedua juga sangat membantu."
+}
+```
+
+Send `comment: ""` to clear the comment text.
 
 ### `DELETE /reviews/:reviewId` (Role: `PATIENT`)
 Delete own review.

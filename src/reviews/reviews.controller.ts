@@ -17,6 +17,7 @@ import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { AuthUser } from '../common/types/auth-user.type';
 import { CreateReviewDto } from './dto/create-review.dto';
 import { ModerateReviewDto } from './dto/moderate-review.dto';
+import { UpdateReviewDto } from './dto/update-review.dto';
 import { ReviewsService } from './reviews.service';
 
 @ApiTags('Reviews')
@@ -27,7 +28,9 @@ export class ReviewsController {
 
   @Roles(UserRole.PATIENT)
   @Post('reviews')
-  @ApiOperation({ summary: 'Create review for completed booking' })
+  @ApiOperation({
+    summary: 'Create review for completed booking or consultation',
+  })
   createReview(@Req() req: Request, @Body() dto: CreateReviewDto) {
     return this.reviewsService.createReview(req.user as AuthUser, dto);
   }
@@ -49,6 +52,21 @@ export class ReviewsController {
     return this.reviewsService.listPublicReviewsByPhysiotherapist(
       physiotherapistId,
       query,
+    );
+  }
+
+  @Roles(UserRole.PATIENT)
+  @Patch('reviews/:reviewId')
+  @ApiOperation({ summary: 'Update own review (rating and/or comment)' })
+  updateMyReview(
+    @Req() req: Request,
+    @Param('reviewId') reviewId: string,
+    @Body() dto: UpdateReviewDto,
+  ) {
+    return this.reviewsService.updateMyReview(
+      req.user as AuthUser,
+      reviewId,
+      dto,
     );
   }
 

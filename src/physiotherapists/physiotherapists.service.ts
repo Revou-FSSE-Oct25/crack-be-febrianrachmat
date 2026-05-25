@@ -14,6 +14,7 @@ import { AuthUser } from '../common/types/auth-user.type';
 import {
   attachReviewStats,
   isRatingSort,
+  profileReviewStatsInclude,
   resolveBrowseOrderBy,
   sortProfileIdsByRating,
 } from './browse.helpers';
@@ -26,10 +27,7 @@ const browseProfileInclude = {
     select: { id: true, fullName: true, email: true, phoneNumber: true },
   },
   category: true,
-  reviews: {
-    where: { isHidden: false },
-    select: { rating: true },
-  },
+  reviews: profileReviewStatsInclude,
 } satisfies Prisma.PhysiotherapistProfileInclude;
 
 /** Presence window after each heartbeat (therapist dashboard tab open). */
@@ -143,6 +141,7 @@ export class PhysiotherapistsService {
           select: { id: true, fullName: true, email: true, phoneNumber: true },
         },
         category: true,
+        reviews: profileReviewStatsInclude,
       },
     });
 
@@ -152,7 +151,7 @@ export class PhysiotherapistsService {
       );
     }
 
-    return profile;
+    return attachReviewStats(profile);
   }
 
   async browseApproved(query: BrowsePhysiotherapistsQueryDto) {

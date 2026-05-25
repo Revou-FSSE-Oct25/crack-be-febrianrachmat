@@ -213,6 +213,7 @@ model Consultation {
   conversation        Conversation?
   bookings            Booking[]
   transactions        Transaction[]
+  reviews             Review[]
 
   @@index([patientId, physiotherapistId, status])
   @@index([status, startedAt])
@@ -316,9 +317,10 @@ model Transaction {
 }
 
 model Review {
-  /// Post-session review, with moderation controls for admin.
+  /// Post-session review for a completed booking OR consultation (exactly one target).
   id                  String   @id @default(uuid())
-  bookingId           String
+  bookingId           String?
+  consultationId      String?
   patientId           String
   physiotherapistId   String
   rating              Int
@@ -328,11 +330,13 @@ model Review {
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 
-  booking             Booking               @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  booking             Booking?              @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  consultation        Consultation?         @relation(fields: [consultationId], references: [id], onDelete: Cascade)
   patient             PatientProfile        @relation(fields: [patientId], references: [id], onDelete: Cascade)
   physiotherapist     PhysiotherapistProfile @relation(fields: [physiotherapistId], references: [id], onDelete: Cascade)
 
   @@unique([bookingId, patientId])
+  @@unique([consultationId, patientId])
   @@index([physiotherapistId, rating])
 }
 
