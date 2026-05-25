@@ -118,8 +118,10 @@ Detail kebijakan produk: [`product-policy.md`](./product-policy.md).
 
 - Set `NEXT_PUBLIC_API_URL` ke base URL API (bukan connection string Postgres).
 - `JWT_SECRET` harus **sama** dengan backend (verifikasi token di middleware).
-- CI frontend: `npm run lint` + `npm run build` (lihat repo `crack-fe-febrianrachmat`). Belum ada unit test / coverage di FE.
-- Cek koneksi API: `GET {NEXT_PUBLIC_API_URL}/health` atau route Next.js `/api/health` (proxy ringan).
+- CI frontend: `npm run lint` + `npm run build` + `npm test` (helper unit di `src/lib/**/*.test.ts`).
+- Cek koneksi API: `GET {NEXT_PUBLIC_API_URL}/health`, route Next.js `/api/health`, atau halaman `/status` (tombol periksa ulang).
+- **Panduan demo:** `/demo` — akun seed, alur happy path, checklist preflight. Login: pemilih akun demo + kata sandi `password123`.
+- **Keandalan UI:** banner amber jika health gagal (polling ~90 detik); fetch API timeout 20 detik; halaman booking/transaksi/konsultasi punya tombol **Coba lagi** saat gagal muat.
 
 ---
 
