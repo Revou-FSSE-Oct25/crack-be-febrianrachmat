@@ -79,6 +79,12 @@ npm run prisma:seed
 
 Env CI: `DATABASE_URL` / `TEST_DATABASE_URL` ke Postgres service, `DISABLE_THROTTLE=true`, `CONSULTATION_SLA_CRON=false`, `APPOINTMENT_REMINDER_CRON=false`.
 
+### Export CSV (admin operasional)
+
+- `GET /admin/operations/transactions/export?status=PENDING` — unduh transaksi (maks. 10.000 baris, UTF-8 BOM untuk Excel).
+- `GET /admin/operations/bookings/export?status=PENDING` — unduh booking dengan filter status yang sama seperti list JSON.
+- Frontend: tombol **Unduh CSV** di `/admin/operations` (tab pembayaran & monitoring booking).
+
 ---
 
 ## 5. Deploy Railway (backend)

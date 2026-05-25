@@ -6,8 +6,12 @@ import {
   TherapistVerificationStatus,
   TransactionStatus,
 } from '@prisma/client';
+import { buildCsv } from '../common/csv/csv.util';
 import { PrismaService } from '../prisma/prisma.service';
+import { ADMIN_CSV_EXPORT_MAX_ROWS } from './admin-operations-export.constants';
+import { AdminOperationsBookingsExportQueryDto } from './dto/admin-operations-bookings-export-query.dto';
 import { AdminOperationsBookingsQueryDto } from './dto/admin-operations-bookings-query.dto';
+import { AdminOperationsTransactionsExportQueryDto } from './dto/admin-operations-transactions-export-query.dto';
 import { AdminOperationsTransactionsQueryDto } from './dto/admin-operations-transactions-query.dto';
 
 const transactionInclude = {
@@ -138,6 +142,136 @@ export class AdminOperationsService {
         total,
         totalPages: Math.max(1, Math.ceil(total / query.limit)),
       },
+    };
+  }
+
+  async exportTransactionsCsv(
+    query: AdminOperationsTransactionsExportQueryDto,
+  ): Promise<{ csv: string; filename: string; rowCount: number }> {
+    const where: Prisma.TransactionWhereInput = {};
+    if (query.status) {
+      where.status = query.status;
+    }
+
+    const items = await this.prisma.transaction.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      take: ADMIN_CSV_EXPORT_MAX_ROWS,
+      include: transactionInclude,
+    });
+
+    const headers = [
+      'id',
+      'status',
+      'amount',
+      'paymentMethod',
+      'hasPaymentProof',
+      'paymentProofUrl',
+      'referenceType',
+      'bookingId',
+      'consultationId',
+      'patientId',
+      'patientName',
+      'patientEmail',
+      'createdAt',
+      'paidAt',
+      'bookingStatus',
+      'bookingAppointmentType',
+      'bookingAppointmentDate',
+      'consultationStatus',
+      'consultationComplaint',
+    ];
+
+    const rows = items.map((row) => {
+      const mapped = this.mapTransaction(row);
+      return [
+        mapped.id,
+        mapped.status,
+        mapped.amount,
+        mapped.paymentMethod,
+        mapped.hasPaymentProof,
+        mapped.paymentProofUrl ?? '',
+        mapped.referenceType,
+        mapped.bookingId ?? '',
+        mapped.consultationId ?? '',
+        mapped.patient.id,
+        mapped.patient.fullName,
+        mapped.patient.email,
+        mapped.createdAt,
+        mapped.paidAt ?? '',
+        mapped.booking?.status ?? '',
+        mapped.booking?.appointmentType ?? '',
+        mapped.booking?.appointmentDate ?? '',
+        mapped.consultation?.status ?? '',
+        mapped.consultation?.complaint ?? '',
+      ];
+    });
+
+    const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+    const statusSuffix = query.status ? `-${query.status.toLowerCase()}` : '';
+    return {
+      csv: buildCsv(headers, rows),
+      filename: `transactions-export${statusSuffix}-${stamp}.csv`,
+      rowCount: items.length,
+    };
+  }
+
+  async exportBookingsCsv(
+    query: AdminOperationsBookingsExportQueryDto,
+  ): Promise<{ csv: string; filename: string; rowCount: number }> {
+    const where: Prisma.BookingWhereInput = {};
+    if (query.status) {
+      where.status = query.status;
+    }
+
+    const items = await this.prisma.booking.findMany({
+      where,
+      orderBy: { appointmentDate: 'desc' },
+      take: ADMIN_CSV_EXPORT_MAX_ROWS,
+      include: bookingInclude,
+    });
+
+    const headers = [
+      'id',
+      'status',
+      'appointmentType',
+      'appointmentDate',
+      'visitFeeSnapshot',
+      'locationLabel',
+      'notes',
+      'createdAt',
+      'patientId',
+      'patientName',
+      'patientEmail',
+      'physiotherapistId',
+      'physiotherapistName',
+    ];
+
+    const rows = items.map((row) => {
+      const mapped = this.mapBooking(row);
+      return [
+        mapped.id,
+        mapped.status,
+        mapped.appointmentType,
+        mapped.appointmentDate,
+        mapped.visitFeeSnapshot,
+        mapped.locationLabel,
+        mapped.notes ?? '',
+        mapped.createdAt,
+        mapped.patient.id,
+        mapped.patient.fullName,
+        mapped.patient.email,
+        mapped.physiotherapist.id,
+        mapped.physiotherapist.fullName,
+      ];
+    });
+
+    const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+    const statusSuffix = query.status ? `-${query.status.toLowerCase()}` : '';
+    return {
+      csv: buildCsv(headers, rows),
+      filename: `bookings-export${statusSuffix}-${stamp}.csv`,
+      rowCount: items.length,
     };
   }
 

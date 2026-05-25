@@ -64,4 +64,71 @@ describe('AdminOperationsService', () => {
     expect(result.recentPendingTransactions[0].referenceType).toBe('BOOKING');
     expect(result.recentPendingTransactions[0].hasPaymentProof).toBe(true);
   });
+
+  it('exportTransactionsCsv builds CSV with header row', async () => {
+    prisma.transaction.findMany.mockResolvedValue([
+      {
+        id: 'tx-1',
+        bookingId: null,
+        consultationId: 'c1',
+        patientId: 'p1',
+        amount: { toString: () => '99000' },
+        paymentMethod: 'BANK_TRANSFER',
+        status: TransactionStatus.PAID,
+        paymentProofUrl: 'https://example.com/proof.png',
+        createdAt: new Date('2099-01-01T10:00:00Z'),
+        paidAt: new Date('2099-01-02T10:00:00Z'),
+        patient: {
+          user: { fullName: 'Pasien A', email: 'a@test.local' },
+        },
+        booking: null,
+        consultation: {
+          id: 'c1',
+          complaint: 'Nyeri punggung',
+          status: 'COMPLETED',
+        },
+      },
+    ]);
+
+    const result = await service.exportTransactionsCsv({
+      status: TransactionStatus.PAID,
+    });
+
+    expect(result.rowCount).toBe(1);
+    expect(result.filename).toContain('transactions-export-paid');
+    expect(result.csv).toContain('id,status,amount');
+    expect(result.csv).toContain('tx-1');
+    expect(result.csv).toContain('Pasien A');
+  });
+
+  it('exportBookingsCsv builds CSV with therapist column', async () => {
+    prisma.booking.findMany.mockResolvedValue([
+      {
+        id: 'bk-1',
+        status: 'CONFIRMED',
+        appointmentType: 'HOME_VISIT',
+        appointmentDate: new Date('2099-03-01T08:00:00Z'),
+        visitFeeSnapshot: { toString: () => '200000' },
+        homeVisitAddress: 'Jl. Demo 1',
+        clinicAddress: null,
+        notes: null,
+        createdAt: new Date('2099-02-01T08:00:00Z'),
+        patientId: 'p1',
+        physiotherapistId: 'pt1',
+        patient: {
+          user: { fullName: 'Pasien B', email: 'b@test.local' },
+        },
+        physiotherapist: {
+          user: { fullName: 'Fisio Demo' },
+        },
+      },
+    ]);
+
+    const result = await service.exportBookingsCsv({});
+
+    expect(result.rowCount).toBe(1);
+    expect(result.csv).toContain('physiotherapistName');
+    expect(result.csv).toContain('Fisio Demo');
+    expect(result.csv).toContain('HOME_VISIT');
+  });
 });
