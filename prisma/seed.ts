@@ -294,6 +294,17 @@ async function main(): Promise<void> {
   const startedAt = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000);
   const completedAt = new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000);
 
+  // Reset payment rows E2E may have created outside fixed demo transaction IDs.
+  await prisma.transaction.deleteMany({
+    where: { consultationId: DEMO.consultRequested },
+  });
+  await prisma.transaction.deleteMany({
+    where: {
+      consultationId: DEMO.consultAccepted,
+      id: { not: DEMO.txConsultPending },
+    },
+  });
+
   await prisma.consultation.upsert({
     where: { id: DEMO.consultRequested },
     create: {
