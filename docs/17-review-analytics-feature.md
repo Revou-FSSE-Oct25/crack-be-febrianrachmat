@@ -45,6 +45,9 @@ Consultation request:
 ```
 
 Responses include `sourceType`: `BOOKING` or `CONSULTATION`.
+Review payload also includes fairness metadata:
+- `editableUntil` (timestamp window end for patient edit/delete)
+- `isEditableByPatient` (derived flag from moderation state + 72h window)
 
 ### `GET /reviews/me` (Roles: `ADMIN`, `PATIENT`, `PHYSIOTHERAPIST`)
 List reviews based on current user scope.
@@ -54,6 +57,11 @@ List public reviews (`isHidden = false`) for selected therapist.
 
 ### `PATCH /reviews/:reviewId` (Role: `PATIENT`)
 Update own review. At least one of `rating` or `comment` must be sent.
+
+Fairness guards:
+- review can only be edited within **72 hours** after submission
+- hidden/moderated reviews cannot be edited by patient
+- comment is normalized (`trim`); empty string clears comment to `null`
 
 Request:
 
@@ -68,6 +76,10 @@ Send `comment: ""` to clear the comment text.
 
 ### `DELETE /reviews/:reviewId` (Role: `PATIENT`)
 Delete own review.
+
+Fairness guards:
+- review can only be deleted within **72 hours** after submission
+- hidden/moderated reviews cannot be deleted by patient
 
 ### `PATCH /admin/reviews/:reviewId/moderate` (Role: `ADMIN`)
 Hide or unhide review and add moderation note.

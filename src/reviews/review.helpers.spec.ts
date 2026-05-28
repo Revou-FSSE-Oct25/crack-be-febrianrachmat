@@ -34,5 +34,7 @@ describe('review.helpers', () => {
       updatedAt: new Date('2026-01-01'),
     });
     expect(mapped.sourceType).toBe('CONSULTATION');
+    expect(mapped.editableUntil).toBeInstanceOf(Date);
+    expect(typeof mapped.isEditableByPatient).toBe('boolean');
   });
 });

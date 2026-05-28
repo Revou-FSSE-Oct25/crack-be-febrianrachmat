@@ -19,7 +19,10 @@ import { AuthUser } from '../common/types/auth-user.type';
 import { CreateReviewDto } from './dto/create-review.dto';
 import { ModerateReviewDto } from './dto/moderate-review.dto';
 import { UpdateReviewDto } from './dto/update-review.dto';
-import { mapReviewResponse } from './review.helpers';
+import {
+  mapReviewResponse,
+  REVIEW_MUTATION_WINDOW_HOURS,
+} from './review.helpers';
 
 type ReviewTarget =
   | { kind: 'booking'; bookingId: string; physiotherapistId: string }
@@ -80,7 +83,7 @@ export class ReviewsService {
         patientId: patient.id,
         physiotherapistId: target.physiotherapistId,
         rating: dto.rating,
-        comment: dto.comment,
+        comment: this.normalizeReviewComment(dto.comment),
       },
     });
 
@@ -127,17 +130,13 @@ export class ReviewsService {
     if (!patient || review.patientId !== patient.id) {
       throw new ForbiddenException('You can only update your own review.');
     }
+    this.assertReviewMutable(review.createdAt, review.isHidden);
 
     const updated = await this.prisma.review.update({
       where: { id: reviewId },
       data: {
         rating: dto.rating,
-        comment:
-          dto.comment !== undefined
-            ? dto.comment.trim() === ''
-              ? null
-              : dto.comment
-            : undefined,
+        comment: this.normalizeReviewComment(dto.comment),
       },
     });
 
@@ -287,6 +286,7 @@ export class ReviewsService {
     if (!patient || review.patientId !== patient.id) {
       throw new ForbiddenException('You can only delete your own review.');
     }
+    this.assertReviewMutable(review.createdAt, review.isHidden);
 
     await this.prisma.review.delete({ where: { id: reviewId } });
     return { message: 'Review deleted successfully.' };
@@ -355,6 +355,30 @@ export class ReviewsService {
       await this.notificationsService.createSystemNotification(userId, title, body);
     } catch {
       // Notification failures should not break review operations.
+    }
+  }
+
+  private normalizeReviewComment(comment?: string): string | null | undefined {
+    if (comment === undefined) {
+      return undefined;
+    }
+    const normalized = comment.trim();
+    return normalized === '' ? null : normalized;
+  }
+
+  private assertReviewMutable(createdAt: Date, isHidden: boolean): void {
+    if (isHidden) {
+      throw new BadRequestException(
+        'Review is currently moderated and cannot be edited or deleted.',
+      );
+    }
+    const editableUntil = new Date(
+      createdAt.getTime() + REVIEW_MUTATION_WINDOW_HOURS * 60 * 60 * 1000,
+    );
+    if (Date.now() > editableUntil.getTime()) {
+      throw new BadRequestException(
+        `Review can only be edited or deleted within ${REVIEW_MUTATION_WINDOW_HOURS} hours after submission.`,
+      );
     }
   }
 }
