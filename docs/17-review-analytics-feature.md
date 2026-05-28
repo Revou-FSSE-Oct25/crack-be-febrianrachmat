@@ -113,7 +113,13 @@ Extended analytics for charts (7–90 days, default 30):
 - review distribution and average rating
 - payment mix (booking vs consultation PAID counts and revenue)
 - top 5 therapists by average visible review rating
+- operational KPIs: booking success rate, cancel rate, estimated no-show rate, repeat patient rate
+- daily/weekly booking ops series: completed, cancelled, estimated no-show
+- top physiotherapists by completed bookings in selected period
 - audit log entries in the selected period
+
+> **No-show note:** current schema has no explicit `NO_SHOW` status.  
+> API exposes `bookingNoShowEstimated` as bookings still in `CONFIRMED` after `appointmentDate` passed.
 
 ## Database relations involved
 
