@@ -17,6 +17,7 @@ import type { Express } from 'express';
 import {
   ApiBearerAuth,
   ApiCreatedResponse,
+  ApiOkResponse,
   ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
@@ -174,6 +175,30 @@ export class BookingsController {
     return this.bookingsService.triggerAppointmentReminderScanByAdmin(
       req.user as AuthUser,
     );
+  }
+
+  @Roles(UserRole.ADMIN)
+  @Get('admin/bookings/reminders/last-scan')
+  @ApiOperation({
+    summary: 'Get latest manual appointment reminder scan status (admin)',
+  })
+  @ApiOkResponse({
+    description:
+      'Returns the latest manual reminder scan summary if available.',
+    schema: {
+      example: {
+        found: true,
+        lastScan: {
+          checked: 12,
+          sent: 3,
+          triggeredBy: 'admin-user-id',
+          triggeredAt: '2026-05-28T06:05:00.000Z',
+        },
+      },
+    },
+  })
+  getLastAppointmentReminderScanStatus() {
+    return this.bookingsService.getLastAppointmentReminderScanStatus();
   }
 
   @Roles(UserRole.ADMIN)

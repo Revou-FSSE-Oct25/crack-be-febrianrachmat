@@ -34,6 +34,7 @@ describe('Bookings listing (e2e-lite)', () => {
     updateBookingStatus: jest.fn(),
     createTransaction: jest.fn(),
     triggerAppointmentReminderScanByAdmin: jest.fn(),
+    getLastAppointmentReminderScanStatus: jest.fn(),
     markTransactionPaidByAdmin: jest.fn(),
     refundTransactionByAdmin: jest.fn(),
     listTransactions: jest.fn(),
@@ -219,5 +220,36 @@ describe('Bookings listing (e2e-lite)', () => {
       email: 'admin@mail.com',
       role: UserRole.ADMIN,
     });
+  });
+
+  it('GET /admin/bookings/reminders/last-scan returns latest manual scan payload', async () => {
+    bookingsServiceMock.getLastAppointmentReminderScanStatus.mockResolvedValue({
+      found: true,
+      lastScan: {
+        checked: 4,
+        sent: 1,
+        triggeredBy: 'admin-user-1',
+        triggeredAt: '2099-01-01T00:00:00.000Z',
+      },
+    });
+
+    await request(app.getHttpServer())
+      .get('/admin/bookings/reminders/last-scan')
+      .expect(200)
+      .expect(({ body }) => {
+        expect(body).toEqual({
+          found: true,
+          lastScan: {
+            checked: 4,
+            sent: 1,
+            triggeredBy: 'admin-user-1',
+            triggeredAt: '2099-01-01T00:00:00.000Z',
+          },
+        });
+      });
+
+    expect(
+      bookingsServiceMock.getLastAppointmentReminderScanStatus,
+    ).toHaveBeenCalled();
   });
 });

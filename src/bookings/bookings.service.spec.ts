@@ -26,6 +26,7 @@ describe('BookingsService', () => {
       updateMany: jest.fn(),
       findMany: jest.fn(),
     },
+    auditLog: { findFirst: jest.fn() },
     message: { count: jest.fn() },
     $transaction: jest.fn(),
   };
@@ -864,5 +865,51 @@ describe('BookingsService', () => {
     );
     processSpy.mockRestore();
     jest.useRealTimers();
+  });
+
+  it('returns latest manual reminder scan status from audit log', async () => {
+    prismaMock.auditLog.findFirst.mockResolvedValue({
+      actorUserId: 'admin-user-1',
+      createdAt: new Date('2099-01-01T00:00:00.000Z'),
+      metadata: {
+        checked: 8,
+        sent: 2,
+        triggeredBy: 'admin-user-1',
+        triggeredAt: '2099-01-01T00:00:00.000Z',
+      },
+    });
+
+    const result = await service.getLastAppointmentReminderScanStatus();
+
+    expect(prismaMock.auditLog.findFirst).toHaveBeenCalledWith({
+      where: {
+        action: 'APPOINTMENT_REMINDER_MANUAL_SCAN',
+        entityType: 'BOOKING',
+        entityId: 'appointment-reminder-scan',
+      },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        actorUserId: true,
+        createdAt: true,
+        metadata: true,
+      },
+    });
+    expect(result).toEqual({
+      found: true,
+      lastScan: {
+        checked: 8,
+        sent: 2,
+        triggeredBy: 'admin-user-1',
+        triggeredAt: '2099-01-01T00:00:00.000Z',
+      },
+    });
+  });
+
+  it('returns found=false when no manual reminder scan exists', async () => {
+    prismaMock.auditLog.findFirst.mockResolvedValue(null);
+
+    const result = await service.getLastAppointmentReminderScanStatus();
+
+    expect(result).toEqual({ found: false, lastScan: null });
   });
 });

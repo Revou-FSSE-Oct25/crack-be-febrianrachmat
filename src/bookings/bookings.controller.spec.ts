@@ -11,6 +11,7 @@ describe('BookingsController', () => {
     updateBookingStatus: jest.fn(),
     createTransaction: jest.fn(),
     triggerAppointmentReminderScanByAdmin: jest.fn(),
+    getLastAppointmentReminderScanStatus: jest.fn(),
     markTransactionPaidByAdmin: jest.fn(),
     refundTransactionByAdmin: jest.fn(),
     listTransactions: jest.fn(),
@@ -127,5 +128,23 @@ describe('BookingsController', () => {
     expect(
       bookingsServiceMock.triggerAppointmentReminderScanByAdmin,
     ).toHaveBeenCalledWith(ADMIN_USER);
+  });
+
+  it('delegates latest reminder scan status read', async () => {
+    bookingsServiceMock.getLastAppointmentReminderScanStatus.mockResolvedValue({
+      found: true,
+      lastScan: {
+        checked: 3,
+        sent: 1,
+        triggeredBy: 'admin-user-1',
+        triggeredAt: '2099-01-01T00:00:00.000Z',
+      },
+    });
+
+    await controller.getLastAppointmentReminderScanStatus();
+
+    expect(
+      bookingsServiceMock.getLastAppointmentReminderScanStatus,
+    ).toHaveBeenCalled();
   });
 });

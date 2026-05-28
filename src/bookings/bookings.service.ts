@@ -620,6 +620,60 @@ export class BookingsService {
     };
   }
 
+  async getLastAppointmentReminderScanStatus(): Promise<{
+    found: boolean;
+    lastScan: null | {
+      checked: number;
+      sent: number;
+      triggeredBy: string;
+      triggeredAt: string;
+    };
+  }> {
+    const latest = await this.prisma.auditLog.findFirst({
+      where: {
+        action: AuditAction.APPOINTMENT_REMINDER_MANUAL_SCAN,
+        entityType: AuditEntityType.BOOKING,
+        entityId: 'appointment-reminder-scan',
+      },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        actorUserId: true,
+        createdAt: true,
+        metadata: true,
+      },
+    });
+
+    if (!latest) {
+      return { found: false, lastScan: null };
+    }
+
+    const metadata =
+      latest.metadata && typeof latest.metadata === 'object'
+        ? (latest.metadata as Record<string, unknown>)
+        : {};
+    const checked =
+      typeof metadata.checked === 'number' ? metadata.checked : 0;
+    const sent = typeof metadata.sent === 'number' ? metadata.sent : 0;
+    const triggeredBy =
+      typeof metadata.triggeredBy === 'string'
+        ? metadata.triggeredBy
+        : (latest.actorUserId ?? 'system');
+    const triggeredAt =
+      typeof metadata.triggeredAt === 'string'
+        ? metadata.triggeredAt
+        : latest.createdAt.toISOString();
+
+    return {
+      found: true,
+      lastScan: {
+        checked,
+        sent,
+        triggeredBy,
+        triggeredAt,
+      },
+    };
+  }
+
   async listMyBookings(authUser: AuthUser, query: PaginationQueryDto) {
     const skip = (query.page - 1) * query.limit;
     const take = query.limit;

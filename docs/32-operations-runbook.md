@@ -92,6 +92,7 @@ Env CI: `DATABASE_URL` / `TEST_DATABASE_URL` ke Postgres service, `DISABLE_THROT
 
 - `POST /admin/bookings/reminders/scan` — memicu scan reminder booking saat itu juga (di luar jadwal cron).
 - Respons berisi jumlah booking yang dicek (`checked`), reminder terkirim (`sent`), dan metadata trigger (`triggeredBy`, `triggeredAt`).
+- `GET /admin/bookings/reminders/last-scan` — observability endpoint untuk membaca ringkasan scan manual terakhir dari audit log.
 
 ---
 
