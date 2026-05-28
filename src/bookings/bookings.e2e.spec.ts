@@ -15,10 +15,11 @@ describe('Bookings listing (e2e-lite)', () => {
   class MockAuthGuard implements CanActivate {
     canActivate(context: ExecutionContext): boolean {
       const req = context.switchToHttp().getRequest();
+      const isAdminPath = String(req.path ?? '').startsWith('/admin/');
       req.user = {
-        sub: 'patient-user-1',
-        email: 'patient@mail.com',
-        role: UserRole.PATIENT,
+        sub: isAdminPath ? 'admin-user-1' : 'patient-user-1',
+        email: isAdminPath ? 'admin@mail.com' : 'patient@mail.com',
+        role: isAdminPath ? UserRole.ADMIN : UserRole.PATIENT,
       };
       return true;
     }
@@ -32,6 +33,7 @@ describe('Bookings listing (e2e-lite)', () => {
     listMyBookings: jest.fn(),
     updateBookingStatus: jest.fn(),
     createTransaction: jest.fn(),
+    triggerAppointmentReminderScanByAdmin: jest.fn(),
     markTransactionPaidByAdmin: jest.fn(),
     refundTransactionByAdmin: jest.fn(),
     listTransactions: jest.fn(),
@@ -188,5 +190,34 @@ describe('Bookings listing (e2e-lite)', () => {
       'booking-1',
       { status: 'CANCELLED' },
     );
+  });
+
+  it('POST /admin/bookings/reminders/scan triggers manual reminder scan as admin', async () => {
+    bookingsServiceMock.triggerAppointmentReminderScanByAdmin.mockResolvedValue({
+      checked: 4,
+      sent: 1,
+      triggeredBy: 'admin-user-1',
+      triggeredAt: '2099-01-01T00:00:00.000Z',
+    });
+
+    await request(app.getHttpServer())
+      .post('/admin/bookings/reminders/scan')
+      .expect(201)
+      .expect(({ body }) => {
+        expect(body).toEqual({
+          checked: 4,
+          sent: 1,
+          triggeredBy: 'admin-user-1',
+          triggeredAt: '2099-01-01T00:00:00.000Z',
+        });
+      });
+
+    expect(
+      bookingsServiceMock.triggerAppointmentReminderScanByAdmin,
+    ).toHaveBeenCalledWith({
+      sub: 'admin-user-1',
+      email: 'admin@mail.com',
+      role: UserRole.ADMIN,
+    });
   });
 });

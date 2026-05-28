@@ -17,7 +17,7 @@ describe('BookingsService', () => {
       update: jest.fn(),
     },
     availabilitySlot: { findUnique: jest.fn(), updateMany: jest.fn() },
-    booking: { findUnique: jest.fn(), findMany: jest.fn() },
+    booking: { findUnique: jest.fn(), findMany: jest.fn(), update: jest.fn() },
     transaction: {
       findUnique: jest.fn(),
       findFirst: jest.fn(),
@@ -765,5 +765,104 @@ describe('BookingsService', () => {
       take: 10,
     });
     expect(result).toEqual([{ id: 'tx-1' }, { id: 'tx-2' }]);
+  });
+
+  it('processes appointment reminders only for paid upcoming bookings', async () => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date('2099-05-14T10:00:00.000Z').getTime());
+    prismaMock.booking.findMany.mockResolvedValue([
+      {
+        id: 'booking-1',
+        appointmentType: 'CLINIC_VISIT',
+        clinicAddress: 'Klinik Sehat',
+        homeVisitAddress: null,
+        appointmentDate: new Date('2099-05-15T10:00:00.000Z'),
+        patient: { user: { id: 'patient-user-1', fullName: 'Patient One' } },
+        physiotherapist: {
+          user: { id: 'therapist-user-1', fullName: 'Therapist One' },
+        },
+      },
+    ]);
+    prismaMock.booking.update.mockResolvedValue({
+      id: 'booking-1',
+      appointmentReminderSentAt: new Date('2099-05-14T10:00:00.000Z'),
+    });
+
+    const result = await service.processAppointmentReminders();
+
+    expect(prismaMock.booking.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          status: { in: [BookingStatus.CONFIRMED, BookingStatus.IN_PROGRESS] },
+          transactions: { some: { status: TransactionStatus.PAID } },
+          appointmentReminderSentAt: null,
+        }),
+      }),
+    );
+    expect(notificationsMock.createSystemNotification).toHaveBeenCalledTimes(2);
+    expect(prismaMock.booking.update).toHaveBeenCalledWith({
+      where: { id: 'booking-1' },
+      data: { appointmentReminderSentAt: expect.any(Date) },
+    });
+    expect(result).toEqual({ checked: 1, sent: 1 });
+    jest.useRealTimers();
+  });
+
+  it('skips reminder send when candidate is outside reminder window', async () => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date('2099-05-13T10:00:00.000Z').getTime());
+    prismaMock.booking.findMany.mockResolvedValue([
+      {
+        id: 'booking-1',
+        appointmentType: 'HOME_VISIT',
+        clinicAddress: null,
+        homeVisitAddress: 'Jl. Rumah 12',
+        appointmentDate: new Date('2099-05-15T10:00:00.000Z'),
+        patient: { user: { id: 'patient-user-1', fullName: 'Patient One' } },
+        physiotherapist: {
+          user: { id: 'therapist-user-1', fullName: 'Therapist One' },
+        },
+      },
+    ]);
+
+    const result = await service.processAppointmentReminders();
+
+    expect(notificationsMock.createSystemNotification).not.toHaveBeenCalled();
+    expect(prismaMock.booking.update).not.toHaveBeenCalled();
+    expect(result).toEqual({ checked: 1, sent: 0 });
+    jest.useRealTimers();
+  });
+
+  it('triggers manual appointment reminder scan for admin ops', async () => {
+    const processSpy = jest
+      .spyOn(service, 'processAppointmentReminders')
+      .mockResolvedValue({ checked: 5, sent: 2 });
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date('2099-01-01T00:00:00.000Z').getTime());
+
+    const result = await service.triggerAppointmentReminderScanByAdmin(ADMIN_USER);
+
+    expect(processSpy).toHaveBeenCalled();
+    expect(result).toEqual({
+      checked: 5,
+      sent: 2,
+      triggeredBy: 'admin-user-1',
+      triggeredAt: '2099-01-01T00:00:00.000Z',
+    });
+    expect(auditMock.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'APPOINTMENT_REMINDER_MANUAL_SCAN',
+        entityType: 'BOOKING',
+        entityId: 'appointment-reminder-scan',
+        actor: ADMIN_USER,
+        metadata: expect.objectContaining({
+          checked: 5,
+          sent: 2,
+          triggeredBy: 'admin-user-1',
+        }),
+      }),
+    );
+    processSpy.mockRestore();
+    jest.useRealTimers();
   });
 });

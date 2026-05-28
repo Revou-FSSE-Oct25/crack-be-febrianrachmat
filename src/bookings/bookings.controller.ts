@@ -14,7 +14,12 @@ import {
 import type { Response } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
 import type { Express } from 'express';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiCreatedResponse,
+  ApiOperation,
+  ApiTags,
+} from '@nestjs/swagger';
 import { UserRole } from '@prisma/client';
 import { Request } from 'express';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -145,6 +150,29 @@ export class BookingsController {
       req.user as AuthUser,
       dto,
       uploadedPublicPath,
+    );
+  }
+
+  @Roles(UserRole.ADMIN)
+  @Post('admin/bookings/reminders/scan')
+  @ApiOperation({
+    summary: 'Trigger appointment reminder scan now (admin/manual ops)',
+  })
+  @ApiCreatedResponse({
+    description:
+      'Manual reminder scan executed. Returns reminder counters and trigger metadata.',
+    schema: {
+      example: {
+        checked: 12,
+        sent: 3,
+        triggeredBy: 'admin-user-id',
+        triggeredAt: '2026-05-28T06:05:00.000Z',
+      },
+    },
+  })
+  triggerAppointmentReminderScan(@Req() req: Request) {
+    return this.bookingsService.triggerAppointmentReminderScanByAdmin(
+      req.user as AuthUser,
     );
   }
 

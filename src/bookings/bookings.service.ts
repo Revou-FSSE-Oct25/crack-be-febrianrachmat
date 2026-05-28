@@ -528,6 +528,9 @@ export class BookingsService {
         status: {
           in: [BookingStatus.CONFIRMED, BookingStatus.IN_PROGRESS],
         },
+        transactions: {
+          some: { status: TransactionStatus.PAID },
+        },
         appointmentReminderSentAt: null,
         appointmentDate: { gt: now },
       },
@@ -584,6 +587,37 @@ export class BookingsService {
     }
 
     return { checked: candidates.length, sent };
+  }
+
+  async triggerAppointmentReminderScanByAdmin(actor?: AuthUser): Promise<{
+    checked: number;
+    sent: number;
+    triggeredBy: string;
+    triggeredAt: string;
+  }> {
+    const result = await this.processAppointmentReminders();
+    const triggeredBy = actor?.sub ?? 'system';
+    const triggeredAt = new Date().toISOString();
+    this.logger.log(
+      `Manual appointment reminder scan by ${triggeredBy}: checked=${result.checked}, sent=${result.sent}`,
+    );
+    await this.auditService.record({
+      action: AuditAction.APPOINTMENT_REMINDER_MANUAL_SCAN,
+      entityType: AuditEntityType.BOOKING,
+      entityId: 'appointment-reminder-scan',
+      actor: actor ?? null,
+      metadata: {
+        checked: result.checked,
+        sent: result.sent,
+        triggeredBy,
+        triggeredAt,
+      },
+    });
+    return {
+      ...result,
+      triggeredBy,
+      triggeredAt,
+    };
   }
 
   async listMyBookings(authUser: AuthUser, query: PaginationQueryDto) {

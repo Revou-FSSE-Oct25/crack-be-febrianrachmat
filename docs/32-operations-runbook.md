@@ -31,6 +31,9 @@ Lihat `.env.example`. Ringkasan:
 | `CORS_ORIGINS` | Produksi disarankan | Daftar origin frontend dipisah koma. Kosong = izinkan semua (dev). |
 | `DISABLE_THROTTLE` | Opsional | `true` untuk test/CI agar rate limit tidak mengganggu. |
 | `CONSULTATION_SLA_CRON` | Opsional | `false` menonaktifkan cron refund SLA otomatis (disarankan di CI/test). |
+| `APPOINTMENT_REMINDER_CRON` | Opsional | `false` menonaktifkan cron reminder janji temu otomatis. |
+| `APPOINTMENT_REMINDER_HOURS_BEFORE` | Opsional | Jarak reminder sebelum jadwal (default `24` jam). |
+| `APPOINTMENT_REMINDER_WINDOW_MINUTES` | Opsional | Lebar window pengiriman reminder (default `60` menit). |
 | `NODE_ENV=production` | Produksi | Wajib `JWT_SECRET` kuat (≥32 char) dan `CORS_ORIGINS` terisi. |
 
 **Bukti bayar:** file upload hanya bisa diakses lewat `GET /transactions/:id/payment-proof` (JWT). Jangan mengandalkan URL `/uploads/...` publik.
@@ -84,6 +87,11 @@ Env CI: `DATABASE_URL` / `TEST_DATABASE_URL` ke Postgres service, `DISABLE_THROT
 - `GET /admin/operations/transactions/export?status=PENDING` — unduh transaksi (maks. 10.000 baris, UTF-8 BOM untuk Excel).
 - `GET /admin/operations/bookings/export?status=PENDING` — unduh booking dengan filter status yang sama seperti list JSON.
 - Frontend: tombol **Unduh CSV** di `/admin/operations` (tab pembayaran & monitoring booking).
+
+### Manual trigger (admin operasional)
+
+- `POST /admin/bookings/reminders/scan` — memicu scan reminder booking saat itu juga (di luar jadwal cron).
+- Respons berisi jumlah booking yang dicek (`checked`), reminder terkirim (`sent`), dan metadata trigger (`triggeredBy`, `triggeredAt`).
 
 ---
 

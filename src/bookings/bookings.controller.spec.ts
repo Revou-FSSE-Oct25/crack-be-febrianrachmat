@@ -10,6 +10,7 @@ describe('BookingsController', () => {
     listMyBookings: jest.fn(),
     updateBookingStatus: jest.fn(),
     createTransaction: jest.fn(),
+    triggerAppointmentReminderScanByAdmin: jest.fn(),
     markTransactionPaidByAdmin: jest.fn(),
     refundTransactionByAdmin: jest.fn(),
     listTransactions: jest.fn(),
@@ -111,5 +112,20 @@ describe('BookingsController', () => {
       'tx-1',
       ADMIN_USER,
     );
+  });
+
+  it('delegates admin reminder scan trigger', async () => {
+    bookingsServiceMock.triggerAppointmentReminderScanByAdmin.mockResolvedValue({
+      checked: 3,
+      sent: 2,
+      triggeredBy: 'admin-user-1',
+      triggeredAt: '2099-01-01T00:00:00.000Z',
+    });
+
+    await controller.triggerAppointmentReminderScan(ADMIN_REQ as never);
+
+    expect(
+      bookingsServiceMock.triggerAppointmentReminderScanByAdmin,
+    ).toHaveBeenCalledWith(ADMIN_USER);
   });
 });
