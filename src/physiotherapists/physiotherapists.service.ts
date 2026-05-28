@@ -1,7 +1,5 @@
 import {
-  BadRequestException,
   Injectable,
-  NotFoundException,
 } from '@nestjs/common';
 import {
   AuditAction,
@@ -14,6 +12,10 @@ import { AuditService } from '../audit/audit.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthUser } from '../common/types/auth-user.type';
+import {
+  badRequestBusinessError,
+  notFoundBusinessError,
+} from '../common/errors/business-error';
 import {
   attachReviewStats,
   isRatingSort,
@@ -54,7 +56,10 @@ export class PhysiotherapistsService {
       where: { userId: authUser.sub },
     });
     if (!profile) {
-      throw new NotFoundException('Physiotherapist profile not found.');
+      throw notFoundBusinessError(
+        'PROFILE_NOT_FOUND',
+        'Physiotherapist profile not found.',
+      );
     }
     const until = new Date(Date.now() + ONLINE_HEARTBEAT_TTL_MS);
     return this.prisma.physiotherapistProfile.update({
@@ -79,7 +84,10 @@ export class PhysiotherapistsService {
     });
 
     if (!profile) {
-      throw new NotFoundException('Physiotherapist profile not found.');
+      throw notFoundBusinessError(
+        'PROFILE_NOT_FOUND',
+        'Physiotherapist profile not found.',
+      );
     }
 
     return profile;
@@ -94,7 +102,10 @@ export class PhysiotherapistsService {
         where: { id: dto.categoryId },
       });
       if (!category) {
-        throw new BadRequestException('Category does not exist.');
+        throw badRequestBusinessError(
+          'CATEGORY_NOT_FOUND',
+          'Category does not exist.',
+        );
       }
     }
 
@@ -150,7 +161,8 @@ export class PhysiotherapistsService {
     });
 
     if (!profile) {
-      throw new NotFoundException(
+      throw notFoundBusinessError(
+        'PROFILE_NOT_FOUND',
         'Physiotherapist not found or not approved yet.',
       );
     }
@@ -201,10 +213,53 @@ export class PhysiotherapistsService {
   private async buildBrowseWhere(
     query: BrowsePhysiotherapistsQueryDto,
   ): Promise<Prisma.PhysiotherapistProfileWhereInput | null> {
+    if (
+      query.minVisitFee != null &&
+      query.maxVisitFee != null &&
+      query.minVisitFee > query.maxVisitFee
+    ) {
+      throw badRequestBusinessError(
+        'INVALID_FILTER',
+        'minVisitFee cannot be greater than maxVisitFee.',
+      );
+    }
+    if (
+      query.minConsultationFee != null &&
+      query.maxConsultationFee != null &&
+      query.minConsultationFee > query.maxConsultationFee
+    ) {
+      throw badRequestBusinessError(
+        'INVALID_FILTER',
+        'minConsultationFee cannot be greater than maxConsultationFee.',
+      );
+    }
+
     const now = new Date();
     const where: Prisma.PhysiotherapistProfileWhereInput = {
       verificationStatus: TherapistVerificationStatus.APPROVED,
       categoryId: query.categoryId,
+      experienceYears:
+        query.minExperienceYears != null
+          ? { gte: query.minExperienceYears }
+          : undefined,
+      visitFee:
+        query.minVisitFee != null || query.maxVisitFee != null
+          ? {
+              ...(query.minVisitFee != null && { gte: query.minVisitFee }),
+              ...(query.maxVisitFee != null && { lte: query.maxVisitFee }),
+            }
+          : undefined,
+      consultationFee:
+        query.minConsultationFee != null || query.maxConsultationFee != null
+          ? {
+              ...(query.minConsultationFee != null && {
+                gte: query.minConsultationFee,
+              }),
+              ...(query.maxConsultationFee != null && {
+                lte: query.maxConsultationFee,
+              }),
+            }
+          : undefined,
       ...(query.onlineNow === true
         ? { onlineUntil: { gt: now } }
         : {}),
@@ -235,6 +290,47 @@ export class PhysiotherapistsService {
         return null;
       }
       where.id = { in: ids };
+    }
+
+    if (query.availableDay != null || query.availableHour != null) {
+      const upcomingSlots = await this.prisma.availabilitySlot.findMany({
+        where: {
+          isAvailable: true,
+          startTime: { gte: now },
+        },
+        select: {
+          physiotherapistId: true,
+          startTime: true,
+        },
+      });
+
+      const ids = Array.from(
+        new Set(
+          upcomingSlots
+            .filter((slot) => {
+              const dayMatch =
+                query.availableDay == null
+                  ? true
+                  : slot.startTime.getUTCDay() === query.availableDay;
+              const hourMatch =
+                query.availableHour == null
+                  ? true
+                  : slot.startTime.getUTCHours() === query.availableHour;
+              return dayMatch && hourMatch;
+            })
+            .map((slot) => slot.physiotherapistId),
+        ),
+      );
+
+      if (ids.length === 0) {
+        return null;
+      }
+      const existingAnd = Array.isArray(where.AND)
+        ? where.AND
+        : where.AND
+          ? [where.AND]
+          : [];
+      where.AND = [...existingAnd, { id: { in: ids } }];
     }
 
     return where;
@@ -313,7 +409,8 @@ export class PhysiotherapistsService {
       dto.status === TherapistVerificationStatus.REJECTED &&
       !dto.rejectionReason
     ) {
-      throw new BadRequestException(
+      throw badRequestBusinessError(
+        'VERIFICATION_INVALID',
         'rejectionReason is required when status is REJECTED.',
       );
     }
@@ -321,7 +418,10 @@ export class PhysiotherapistsService {
     if (
       dto.status === TherapistVerificationStatus.PENDING
     ) {
-      throw new BadRequestException('Admin verification must be APPROVED or REJECTED.');
+      throw badRequestBusinessError(
+        'VERIFICATION_INVALID',
+        'Admin verification must be APPROVED or REJECTED.',
+      );
     }
 
     const existing = await this.prisma.physiotherapistProfile.findUnique({
@@ -329,7 +429,10 @@ export class PhysiotherapistsService {
     });
 
     if (!existing) {
-      throw new NotFoundException('Physiotherapist profile not found.');
+      throw notFoundBusinessError(
+        'PROFILE_NOT_FOUND',
+        'Physiotherapist profile not found.',
+      );
     }
 
     const updated = await this.prisma.physiotherapistProfile.update({

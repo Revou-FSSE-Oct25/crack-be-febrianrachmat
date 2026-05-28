@@ -9,20 +9,22 @@ import {
   AuditEntityType,
   BookingStatus,
   ConsultationStatus,
+  Prisma,
   UserRole,
 } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { AuthUser } from '../common/types/auth-user.type';
 import { CreateReviewDto } from './dto/create-review.dto';
+import { ListReviewsQueryDto } from './dto/list-reviews-query.dto';
 import { ModerateReviewDto } from './dto/moderate-review.dto';
 import { UpdateReviewDto } from './dto/update-review.dto';
 import {
   mapReviewResponse,
   REVIEW_MUTATION_WINDOW_HOURS,
 } from './review.helpers';
+import { badRequestBusinessError } from '../common/errors/business-error';
 
 type ReviewTarget =
   | { kind: 'booking'; bookingId: string; physiotherapistId: string }
@@ -68,7 +70,8 @@ export class ReviewsService {
           });
 
     if (existing) {
-      throw new BadRequestException(
+      throw badRequestBusinessError(
+        'REVIEW_DUPLICATE',
         target.kind === 'booking'
           ? 'Review already exists for this booking.'
           : 'Review already exists for this consultation.',
@@ -128,7 +131,7 @@ export class ReviewsService {
       where: { userId: authUser.sub },
     });
     if (!patient || review.patientId !== patient.id) {
-      throw new ForbiddenException('You can only update your own review.');
+      throw new NotFoundException('Review not found.');
     }
     this.assertReviewMutable(review.createdAt, review.isHidden);
 
@@ -157,14 +160,19 @@ export class ReviewsService {
 
   async listPublicReviewsByPhysiotherapist(
     physiotherapistId: string,
-    query: PaginationQueryDto,
+    query: ListReviewsQueryDto,
   ) {
     const skip = (query.page - 1) * query.limit;
     const take = query.limit;
+    const orderBy = this.resolveReviewOrderBy(query.sort);
 
     const rows = await this.prisma.review.findMany({
-      where: { physiotherapistId, isHidden: false },
-      orderBy: { createdAt: 'desc' },
+      where: {
+        physiotherapistId,
+        isHidden: false,
+        ...this.buildReviewFilter(query),
+      },
+      orderBy,
       skip,
       take,
       include: {
@@ -181,9 +189,11 @@ export class ReviewsService {
     });
   }
 
-  async listMyReviews(authUser: AuthUser, query: PaginationQueryDto) {
+  async listMyReviews(authUser: AuthUser, query: ListReviewsQueryDto) {
     const skip = (query.page - 1) * query.limit;
     const take = query.limit;
+    const orderBy = this.resolveReviewOrderBy(query.sort);
+    const filter = this.buildReviewFilter(query);
 
     if (authUser.role === UserRole.PATIENT) {
       const patient = await this.prisma.patientProfile.findUnique({
@@ -191,8 +201,8 @@ export class ReviewsService {
       });
       if (!patient) throw new BadRequestException('Patient profile not found.');
       const rows = await this.prisma.review.findMany({
-        where: { patientId: patient.id },
-        orderBy: { createdAt: 'desc' },
+        where: { patientId: patient.id, ...filter },
+        orderBy,
         skip,
         take,
       });
@@ -207,8 +217,8 @@ export class ReviewsService {
         throw new BadRequestException('Physiotherapist profile not found.');
       }
       const rows = await this.prisma.review.findMany({
-        where: { physiotherapistId: therapist.id },
-        orderBy: { createdAt: 'desc' },
+        where: { physiotherapistId: therapist.id, ...filter },
+        orderBy,
         skip,
         take,
       });
@@ -216,7 +226,8 @@ export class ReviewsService {
     }
 
     const rows = await this.prisma.review.findMany({
-      orderBy: { createdAt: 'desc' },
+      where: filter,
+      orderBy,
       skip,
       take,
     });
@@ -284,7 +295,7 @@ export class ReviewsService {
       where: { userId: authUser.sub },
     });
     if (!patient || review.patientId !== patient.id) {
-      throw new ForbiddenException('You can only delete your own review.');
+      throw new NotFoundException('Review not found.');
     }
     this.assertReviewMutable(review.createdAt, review.isHidden);
 
@@ -368,7 +379,8 @@ export class ReviewsService {
 
   private assertReviewMutable(createdAt: Date, isHidden: boolean): void {
     if (isHidden) {
-      throw new BadRequestException(
+      throw badRequestBusinessError(
+        'REVIEW_LOCKED',
         'Review is currently moderated and cannot be edited or deleted.',
       );
     }
@@ -376,10 +388,46 @@ export class ReviewsService {
       createdAt.getTime() + REVIEW_MUTATION_WINDOW_HOURS * 60 * 60 * 1000,
     );
     if (Date.now() > editableUntil.getTime()) {
-      throw new BadRequestException(
+      throw badRequestBusinessError(
+        'REVIEW_LOCKED',
         `Review can only be edited or deleted within ${REVIEW_MUTATION_WINDOW_HOURS} hours after submission.`,
       );
     }
+  }
+
+  private resolveReviewOrderBy(
+    sort?: ListReviewsQueryDto['sort'],
+  ):
+    | Prisma.ReviewOrderByWithRelationInput
+    | Prisma.ReviewOrderByWithRelationInput[] {
+    switch (sort) {
+      case 'createdAt_asc':
+        return { createdAt: 'asc' };
+      case 'rating_desc':
+        return [{ rating: 'desc' }, { createdAt: 'desc' }];
+      case 'rating_asc':
+        return [{ rating: 'asc' }, { createdAt: 'desc' }];
+      case 'createdAt_desc':
+      default:
+        return { createdAt: 'desc' };
+    }
+  }
+
+  private buildReviewFilter(
+    query: ListReviewsQueryDto,
+  ): Prisma.ReviewWhereInput {
+    return {
+      ...(query.sourceType === 'BOOKING' && {
+        consultationId: null,
+        bookingId: { not: null },
+      }),
+      ...(query.sourceType === 'CONSULTATION' && {
+        consultationId: { not: null },
+      }),
+      ...(query.minRating != null && {
+        rating: { gte: query.minRating },
+      }),
+    };
   }
 }
 

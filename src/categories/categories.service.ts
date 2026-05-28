@@ -1,9 +1,11 @@
 import {
-  BadRequestException,
   Injectable,
-  NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import {
+  badRequestBusinessError,
+  notFoundBusinessError,
+} from '../common/errors/business-error';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 
@@ -19,7 +21,10 @@ export class CategoriesService {
     });
 
     if (existing) {
-      throw new BadRequestException('Category name already exists.');
+      throw badRequestBusinessError(
+        'CATEGORY_DUPLICATE',
+        'Category name already exists.',
+      );
     }
 
     return this.prisma.category.create({
@@ -42,7 +47,7 @@ export class CategoriesService {
     });
 
     if (!existing) {
-      throw new NotFoundException('Category not found.');
+      throw notFoundBusinessError('CATEGORY_NOT_FOUND', 'Category not found.');
     }
 
     const normalizedName = dto.name?.trim();
@@ -52,7 +57,10 @@ export class CategoriesService {
         where: { name: normalizedName },
       });
       if (duplicateName) {
-        throw new BadRequestException('Category name already exists.');
+        throw badRequestBusinessError(
+          'CATEGORY_DUPLICATE',
+          'Category name already exists.',
+        );
       }
     }
 
@@ -78,11 +86,12 @@ export class CategoriesService {
     });
 
     if (!existing) {
-      throw new NotFoundException('Category not found.');
+      throw notFoundBusinessError('CATEGORY_NOT_FOUND', 'Category not found.');
     }
 
     if (existing._count.physiotherapists > 0) {
-      throw new BadRequestException(
+      throw badRequestBusinessError(
+        'CATEGORY_IN_USE',
         'Category is still used by physiotherapists and cannot be deleted.',
       );
     }

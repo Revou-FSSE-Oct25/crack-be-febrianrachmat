@@ -5,6 +5,7 @@ import {
   Header,
   MessageEvent,
   Param,
+  ParseUUIDPipe,
   Post,
   Query,
   Req,
@@ -16,10 +17,11 @@ import { Request } from 'express';
 import { Observable } from 'rxjs';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { SkipEnvelope } from '../common/decorators/skip-envelope.decorator';
-import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { AuthUser } from '../common/types/auth-user.type';
 import { ChatService } from './chat.service';
 import { CreateOrGetConversationDto } from './dto/create-or-get-conversation.dto';
+import { ListConversationsQueryDto } from './dto/list-conversations-query.dto';
+import { ListMessagesQueryDto } from './dto/list-messages-query.dto';
 import { SendMessageDto } from './dto/send-message.dto';
 import { StreamMessagesQueryDto } from './dto/stream-messages-query.dto';
 
@@ -42,7 +44,10 @@ export class ChatController {
   @Roles(UserRole.ADMIN, UserRole.PATIENT, UserRole.PHYSIOTHERAPIST)
   @Get('conversations')
   @ApiOperation({ summary: 'List conversations by current actor' })
-  listMyConversations(@Req() req: Request, @Query() query: PaginationQueryDto) {
+  listMyConversations(
+    @Req() req: Request,
+    @Query() query: ListConversationsQueryDto,
+  ) {
     return this.chatService.listMyConversations(req.user as AuthUser, query);
   }
 
@@ -60,7 +65,7 @@ export class ChatController {
   })
   streamMessages(
     @Req() req: Request,
-    @Param('conversationId') conversationId: string,
+    @Param('conversationId', ParseUUIDPipe) conversationId: string,
     @Query() query: StreamMessagesQueryDto,
   ): Observable<MessageEvent> {
     return this.chatService.streamMessages(
@@ -75,8 +80,8 @@ export class ChatController {
   @ApiOperation({ summary: 'List conversation messages' })
   listMessages(
     @Req() req: Request,
-    @Param('conversationId') conversationId: string,
-    @Query() query: PaginationQueryDto,
+    @Param('conversationId', ParseUUIDPipe) conversationId: string,
+    @Query() query: ListMessagesQueryDto,
   ) {
     return this.chatService.listMessages(
       req.user as AuthUser,
@@ -90,7 +95,7 @@ export class ChatController {
   @ApiOperation({ summary: 'Send message to conversation' })
   sendMessage(
     @Req() req: Request,
-    @Param('conversationId') conversationId: string,
+    @Param('conversationId', ParseUUIDPipe) conversationId: string,
     @Body() dto: SendMessageDto,
   ) {
     return this.chatService.sendMessage(

@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -7,6 +6,7 @@ import { UserRole } from '@prisma/client';
 import { JwtService } from '@nestjs/jwt';
 import { compare, hash } from 'bcryptjs';
 import { PrismaService } from '../prisma/prisma.service';
+import { badRequestBusinessError } from '../common/errors/business-error';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { JwtPayload } from './interfaces/jwt-payload.interface';
@@ -31,7 +31,8 @@ export class AuthService {
     user: AuthUserResponse;
   }> {
     if (dto.role === UserRole.ADMIN) {
-      throw new BadRequestException(
+      throw badRequestBusinessError(
+        'REGISTRATION_ROLE_FORBIDDEN',
         'Public registration cannot create admin account.',
       );
     }
@@ -41,7 +42,10 @@ export class AuthService {
     });
 
     if (existingUser) {
-      throw new BadRequestException('Email is already registered.');
+      throw badRequestBusinessError(
+        'EMAIL_ALREADY_REGISTERED',
+        'Email is already registered.',
+      );
     }
 
     const passwordHash = await hash(dto.password, 10);

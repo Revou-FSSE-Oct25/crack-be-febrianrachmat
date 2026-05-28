@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   Query,
@@ -31,6 +32,8 @@ import { CalendarBookingsQueryDto } from './dto/calendar-bookings-query.dto';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { CreateConsultationDto } from './dto/create-consultation.dto';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
+import { ListBookingsQueryDto } from './dto/list-bookings-query.dto';
+import { ListConsultationsQueryDto } from './dto/list-consultations-query.dto';
 import { RefundTransactionDto } from './dto/refund-transaction.dto';
 import { RescheduleBookingDto } from './dto/reschedule-booking.dto';
 import { UpdateBookingStatusDto } from './dto/update-booking-status.dto';
@@ -58,7 +61,10 @@ export class BookingsController {
   @Roles(UserRole.ADMIN, UserRole.PATIENT, UserRole.PHYSIOTHERAPIST)
   @Get('consultations/me')
   @ApiOperation({ summary: 'List consultations by current actor' })
-  listMyConsultations(@Req() req: Request, @Query() query: PaginationQueryDto) {
+  listMyConsultations(
+    @Req() req: Request,
+    @Query() query: ListConsultationsQueryDto,
+  ) {
     return this.bookingsService.listMyConsultations(
       req.user as AuthUser,
       query,
@@ -70,7 +76,7 @@ export class BookingsController {
   @ApiOperation({ summary: 'Update consultation status' })
   updateConsultationStatus(
     @Req() req: Request,
-    @Param('consultationId') consultationId: string,
+    @Param('consultationId', ParseUUIDPipe) consultationId: string,
     @Body() dto: UpdateConsultationStatusDto,
   ) {
     return this.bookingsService.updateConsultationStatus(
@@ -106,7 +112,7 @@ export class BookingsController {
   @Roles(UserRole.ADMIN, UserRole.PATIENT, UserRole.PHYSIOTHERAPIST)
   @Get('bookings/me')
   @ApiOperation({ summary: 'List bookings by current actor' })
-  listMyBookings(@Req() req: Request, @Query() query: PaginationQueryDto) {
+  listMyBookings(@Req() req: Request, @Query() query: ListBookingsQueryDto) {
     return this.bookingsService.listMyBookings(req.user as AuthUser, query);
   }
 
@@ -115,7 +121,7 @@ export class BookingsController {
   @ApiOperation({ summary: 'Update booking status' })
   updateBookingStatus(
     @Req() req: Request,
-    @Param('bookingId') bookingId: string,
+    @Param('bookingId', ParseUUIDPipe) bookingId: string,
     @Body() dto: UpdateBookingStatusDto,
   ) {
     return this.bookingsService.updateBookingStatus(
@@ -130,7 +136,7 @@ export class BookingsController {
   @ApiOperation({ summary: 'Reschedule booking to another time/slot' })
   rescheduleBooking(
     @Req() req: Request,
-    @Param('bookingId') bookingId: string,
+    @Param('bookingId', ParseUUIDPipe) bookingId: string,
     @Body() dto: RescheduleBookingDto,
   ) {
     return this.bookingsService.rescheduleBooking(
@@ -222,7 +228,10 @@ export class BookingsController {
   @ApiOperation({
     summary: 'Confirm pending transaction as paid (admin / system dummy)',
   })
-  markPaidByAdmin(@Req() req: Request, @Param('transactionId') transactionId: string) {
+  markPaidByAdmin(
+    @Req() req: Request,
+    @Param('transactionId', ParseUUIDPipe) transactionId: string,
+  ) {
     return this.bookingsService.markTransactionPaidByAdmin(
       transactionId,
       req.user as AuthUser,
@@ -234,7 +243,7 @@ export class BookingsController {
   @ApiOperation({ summary: 'Refund paid transaction (admin dummy refund)' })
   refund(
     @Req() req: Request,
-    @Param('transactionId') transactionId: string,
+    @Param('transactionId', ParseUUIDPipe) transactionId: string,
     @Body() dto: RefundTransactionDto,
   ) {
     return this.bookingsService.refundTransactionByAdmin(
@@ -259,7 +268,7 @@ export class BookingsController {
   })
   streamPaymentProof(
     @Req() req: Request,
-    @Param('transactionId') transactionId: string,
+    @Param('transactionId', ParseUUIDPipe) transactionId: string,
     @Res() res: Response,
   ) {
     return this.bookingsService.streamPaymentProof(

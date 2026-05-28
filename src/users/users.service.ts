@@ -1,7 +1,5 @@
 import {
-  BadRequestException,
   Injectable,
-  NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import {
@@ -17,6 +15,10 @@ import { join } from 'path';
 import type { Response } from 'express';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthUser } from '../common/types/auth-user.type';
+import {
+  badRequestBusinessError,
+  notFoundBusinessError,
+} from '../common/errors/business-error';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { DeactivateAccountDto } from './dto/deactivate-account.dto';
 import { UpdateMyProfileDto } from './dto/update-my-profile.dto';
@@ -44,7 +46,7 @@ export class UsersService {
     });
 
     if (!user) {
-      throw new NotFoundException('User not found.');
+      throw notFoundBusinessError('USER_NOT_FOUND', 'User not found.');
     }
 
     return user;
@@ -79,7 +81,7 @@ export class UsersService {
     });
 
     if (!user) {
-      throw new NotFoundException('User not found.');
+      throw notFoundBusinessError('USER_NOT_FOUND', 'User not found.');
     }
 
     return this.streamAvatarFromUrl(user.avatarUrl, res);
@@ -88,7 +90,7 @@ export class UsersService {
   private streamAvatarFromUrl(avatarUrl: string | null | undefined, res: Response) {
     const url = avatarUrl?.trim();
     if (!url) {
-      throw new NotFoundException('No profile photo uploaded.');
+      throw notFoundBusinessError('AVATAR_NOT_FOUND', 'No profile photo uploaded.');
     }
 
     if (url.startsWith('https://') || url.startsWith('http://')) {
@@ -97,17 +99,23 @@ export class UsersService {
     }
 
     if (!url.startsWith('/uploads/avatars/')) {
-      throw new BadRequestException('Invalid avatar storage path.');
+      throw badRequestBusinessError(
+        'AVATAR_PATH_INVALID',
+        'Invalid avatar storage path.',
+      );
     }
 
     const filename = url.replace('/uploads/avatars/', '');
     if (!filename || filename.includes('..')) {
-      throw new BadRequestException('Invalid avatar path.');
+      throw badRequestBusinessError('AVATAR_PATH_INVALID', 'Invalid avatar path.');
     }
 
     const filePath = join(process.cwd(), 'uploads', 'avatars', filename);
     if (!existsSync(filePath)) {
-      throw new NotFoundException('Avatar file not found on server.');
+      throw notFoundBusinessError(
+        'AVATAR_NOT_FOUND',
+        'Avatar file not found on server.',
+      );
     }
 
     res.sendFile(filePath);
@@ -149,7 +157,10 @@ export class UsersService {
         where: { userId: authUser.sub },
       });
       if (!patient) {
-        throw new NotFoundException('Patient profile not found.');
+        throw notFoundBusinessError(
+          'PATIENT_PROFILE_NOT_FOUND',
+          'Patient profile not found.',
+        );
       }
       return this.buildPatientActivitySummary(patient.id);
     }
@@ -158,7 +169,10 @@ export class UsersService {
       where: { userId: authUser.sub },
     });
     if (!therapist) {
-      throw new NotFoundException('Physiotherapist profile not found.');
+      throw notFoundBusinessError(
+        'PROFILE_NOT_FOUND',
+        'Physiotherapist profile not found.',
+      );
     }
     return this.buildTherapistActivitySummary(therapist.id);
   }
@@ -332,7 +346,8 @@ export class UsersService {
 
   async deactivateAccount(authUser: AuthUser, dto: DeactivateAccountDto) {
     if (authUser.role === UserRole.ADMIN) {
-      throw new BadRequestException(
+      throw badRequestBusinessError(
+        'ACCOUNT_STATE_INVALID',
         'Admin accounts cannot be self-deactivated.',
       );
     }
@@ -343,15 +358,19 @@ export class UsersService {
     });
 
     if (!user) {
-      throw new NotFoundException('User not found.');
+      throw notFoundBusinessError('USER_NOT_FOUND', 'User not found.');
     }
 
     if (!user.isActive) {
-      throw new BadRequestException('Account is already inactive.');
+      throw badRequestBusinessError(
+        'ACCOUNT_STATE_INVALID',
+        'Account is already inactive.',
+      );
     }
 
     if (!user.passwordHash) {
-      throw new BadRequestException(
+      throw badRequestBusinessError(
+        'PASSWORD_UNAVAILABLE',
         'Akun masuk lewat Google/Apple/GitHub/Facebook. Nonaktifkan lewat penyedia masuk atau hubungi dukungan.',
       );
     }
@@ -374,7 +393,8 @@ export class UsersService {
 
   async changePassword(authUser: AuthUser, dto: ChangePasswordDto) {
     if (dto.currentPassword === dto.newPassword) {
-      throw new BadRequestException(
+      throw badRequestBusinessError(
+        'PASSWORD_CHANGE_INVALID',
         'New password must be different from current password.',
       );
     }
@@ -385,11 +405,12 @@ export class UsersService {
     });
 
     if (!user) {
-      throw new NotFoundException('User not found.');
+      throw notFoundBusinessError('USER_NOT_FOUND', 'User not found.');
     }
 
     if (!user.passwordHash) {
-      throw new BadRequestException(
+      throw badRequestBusinessError(
+        'PASSWORD_UNAVAILABLE',
         'Akun masuk lewat Google/Apple/GitHub/Facebook. Atur kata sandi belum tersedia untuk akun ini.',
       );
     }

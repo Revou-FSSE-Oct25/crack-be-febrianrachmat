@@ -1,6 +1,5 @@
 import {
   BadRequestException,
-  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -8,10 +7,12 @@ import { MessageEvent } from '@nestjs/common/interfaces';
 import { ConsultationStatus, Prisma, UserRole } from '@prisma/client';
 import { Observable } from 'rxjs';
 import { PrismaService } from '../prisma/prisma.service';
-import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { AuthUser } from '../common/types/auth-user.type';
+import { badRequestBusinessError } from '../common/errors/business-error';
 import { parseChatSsePollMs, parseSinceCursor } from './chat-sse.util';
 import { CreateOrGetConversationDto } from './dto/create-or-get-conversation.dto';
+import { ListConversationsQueryDto } from './dto/list-conversations-query.dto';
+import { ListMessagesQueryDto } from './dto/list-messages-query.dto';
 import { SendMessageDto } from './dto/send-message.dto';
 import { StreamMessagesQueryDto } from './dto/stream-messages-query.dto';
 
@@ -55,7 +56,8 @@ export class ChatService {
       authUser.role !== UserRole.ADMIN &&
       !SENDABLE_CONSULTATION_STATUSES.includes(consultation.status)
     ) {
-      throw new BadRequestException(
+      throw badRequestBusinessError(
+        'CHAT_LOCKED',
         `Chat is locked. Consultation must be IN_PROGRESS (current: ${consultation.status}).`,
       );
     }
@@ -117,13 +119,25 @@ export class ChatService {
     }
   }
 
-  async listMyConversations(authUser: AuthUser, query: PaginationQueryDto) {
+  async listMyConversations(authUser: AuthUser, query: ListConversationsQueryDto) {
     const skip = (query.page - 1) * query.limit;
     const take = query.limit;
+    const orderBy =
+      query.sort === 'updatedAt_asc'
+        ? { updatedAt: 'asc' as const }
+        : query.sort === 'createdAt_desc'
+          ? { createdAt: 'desc' as const }
+          : query.sort === 'createdAt_asc'
+            ? { createdAt: 'asc' as const }
+            : { updatedAt: 'desc' as const };
+    const consultationFilter = query.consultationStatus
+      ? { consultation: { status: query.consultationStatus } }
+      : {};
 
     if (authUser.role === UserRole.ADMIN) {
       return this.prisma.conversation.findMany({
-        orderBy: { updatedAt: 'desc' },
+        where: consultationFilter,
+        orderBy,
         skip,
         take,
         include: {
@@ -135,11 +149,12 @@ export class ChatService {
 
     return this.prisma.conversation.findMany({
       where: {
+        ...consultationFilter,
         participants: {
           some: { userId: authUser.sub },
         },
       },
-      orderBy: { updatedAt: 'desc' },
+      orderBy,
       skip,
       take,
       include: {
@@ -152,16 +167,20 @@ export class ChatService {
   async listMessages(
     authUser: AuthUser,
     conversationId: string,
-    query: PaginationQueryDto,
+    query: ListMessagesQueryDto,
   ) {
     await this.assertCanAccessConversation(authUser, conversationId);
 
     const skip = (query.page - 1) * query.limit;
     const take = query.limit;
+    const orderBy =
+      query.sort === 'createdAt_desc'
+        ? { createdAt: 'desc' as const }
+        : { createdAt: 'asc' as const };
 
     return this.prisma.message.findMany({
       where: { conversationId },
-      orderBy: { createdAt: 'asc' },
+      orderBy,
       skip,
       take,
       include: {
@@ -274,7 +293,8 @@ export class ChatService {
         !consultation ||
         !SENDABLE_CONSULTATION_STATUSES.includes(consultation.status)
       ) {
-        throw new BadRequestException(
+        throw badRequestBusinessError(
+          'CHAT_LOCKED',
           `Chat is locked. Consultation must be IN_PROGRESS (current: ${
             consultation?.status ?? 'UNKNOWN'
           }).`,
@@ -313,7 +333,7 @@ export class ChatService {
       consultation.physiotherapist.userId === authUser.sub;
 
     if (!isParticipant) {
-      throw new ForbiddenException('You are not part of this consultation.');
+      throw new NotFoundException('Consultation not found.');
     }
   }
 
@@ -341,7 +361,7 @@ export class ChatService {
     );
 
     if (!isParticipant) {
-      throw new ForbiddenException('You are not part of this conversation.');
+      throw new NotFoundException('Conversation not found.');
     }
     return conversation;
   }

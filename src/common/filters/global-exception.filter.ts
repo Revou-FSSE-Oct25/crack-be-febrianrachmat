@@ -26,6 +26,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       typeof exceptionResponse === 'object' && exceptionResponse !== null
         ? exceptionResponse
         : undefined;
+    const errorCode = this.extractErrorCode(exceptionResponse);
 
     const message =
       exception instanceof HttpException
@@ -38,6 +39,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       path: request.url,
       error: {
         code: status,
+        ...(errorCode && { errorCode }),
         message,
         details,
       },
@@ -64,5 +66,19 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     }
 
     return 'Request failed';
+  }
+
+  private extractErrorCode(exceptionResponse: unknown): string | undefined {
+    if (
+      typeof exceptionResponse === 'object' &&
+      exceptionResponse !== null &&
+      'errorCode' in exceptionResponse
+    ) {
+      const value = (exceptionResponse as { errorCode?: unknown }).errorCode;
+      if (typeof value === 'string' && value.trim() !== '') {
+        return value;
+      }
+    }
+    return undefined;
   }
 }

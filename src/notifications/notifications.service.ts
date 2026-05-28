@@ -1,6 +1,10 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { AuditAction, AuditEntityType } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
+import {
+  badRequestBusinessError,
+  notFoundBusinessError,
+} from '../common/errors/business-error';
 import { PrismaService } from '../prisma/prisma.service';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { AuthUser } from '../common/types/auth-user.type';
@@ -51,7 +55,10 @@ export class NotificationsService {
       where: { id: notificationId },
     });
     if (!notification || notification.userId !== authUser.sub) {
-      throw new NotFoundException('Notification not found.');
+      throw notFoundBusinessError(
+        'NOTIFICATION_NOT_FOUND',
+        'Notification not found.',
+      );
     }
 
     return this.prisma.notification.update({
@@ -79,7 +86,10 @@ export class NotificationsService {
   ) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) {
-      throw new BadRequestException('Target user does not exist.');
+      throw badRequestBusinessError(
+        'TARGET_USER_NOT_FOUND',
+        'Target user does not exist.',
+      );
     }
 
     const notification = await this.dispatchNotification(

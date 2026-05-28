@@ -1,11 +1,11 @@
 import {
-  BadRequestException,
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
 import { OAuthProvider, UserRole } from '@prisma/client';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../../prisma/prisma.service';
+import { badRequestBusinessError } from '../../common/errors/business-error';
 import { JwtPayload } from '../interfaces/jwt-payload.interface';
 import { listEnabledOAuthProviders } from './oauth-config';
 import { OAuthStateService } from './oauth-state.service';
@@ -59,7 +59,8 @@ export class OAuthService {
   }): string {
     const frontend = process.env.FRONTEND_URL?.trim();
     if (!frontend) {
-      throw new BadRequestException(
+      throw badRequestBusinessError(
+        'OAUTH_CONFIG_MISSING',
         'FRONTEND_URL is not configured for OAuth redirects.',
       );
     }
@@ -124,7 +125,10 @@ export class OAuthService {
 
     const role = this.resolveSignupRole(state.role);
     if (role === UserRole.ADMIN) {
-      throw new BadRequestException('OAuth cannot create admin accounts.');
+      throw badRequestBusinessError(
+        'REGISTRATION_ROLE_FORBIDDEN',
+        'OAuth cannot create admin accounts.',
+      );
     }
 
     return this.prisma.user.create({

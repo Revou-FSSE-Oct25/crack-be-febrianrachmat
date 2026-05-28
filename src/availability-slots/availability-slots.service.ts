@@ -6,6 +6,10 @@ import {
 import { BookingStatus, TherapistVerificationStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthUser } from '../common/types/auth-user.type';
+import {
+  badRequestBusinessError,
+  notFoundBusinessError,
+} from '../common/errors/business-error';
 import { CreateAvailabilitySlotDto } from './dto/create-availability-slot.dto';
 import { ListAvailabilitySlotsQueryDto } from './dto/list-availability-slots-query.dto';
 import { UpdateAvailabilitySlotDto } from './dto/update-availability-slot.dto';
@@ -68,7 +72,10 @@ export class AvailabilitySlotsService {
     });
 
     if (!slot || slot.physiotherapistId !== profile.id) {
-      throw new NotFoundException('Availability slot not found.');
+      throw notFoundBusinessError(
+        'RESOURCE_NOT_FOUND',
+        'Availability slot not found.',
+      );
     }
 
     const blocking = await this.slotHasBlockingBooking(slotId);
@@ -86,7 +93,8 @@ export class AvailabilitySlotsService {
       dto.endTime !== undefined
     ) {
       if (blocking) {
-        throw new BadRequestException(
+        throw badRequestBusinessError(
+          'BOOKING_LOCKED',
           'Cannot change slot window while an active booking uses this slot.',
         );
       }
@@ -117,7 +125,8 @@ export class AvailabilitySlotsService {
 
     if (dto.isAvailable !== undefined) {
       if (dto.isAvailable === true && blocking) {
-        throw new BadRequestException(
+        throw badRequestBusinessError(
+          'BOOKING_LOCKED',
           'Cannot mark slot available while an active booking uses it.',
         );
       }
@@ -146,11 +155,15 @@ export class AvailabilitySlotsService {
     });
 
     if (!slot || slot.physiotherapistId !== profile.id) {
-      throw new NotFoundException('Availability slot not found.');
+      throw notFoundBusinessError(
+        'RESOURCE_NOT_FOUND',
+        'Availability slot not found.',
+      );
     }
 
     if (slot._count.bookings > 0) {
-      throw new BadRequestException(
+      throw badRequestBusinessError(
+        'BOOKING_LOCKED',
         'Cannot delete slot with an active (non-cancelled) booking.',
       );
     }
@@ -254,10 +267,14 @@ export class AvailabilitySlotsService {
       throw new BadRequestException('Invalid date/time values.');
     }
     if (start >= end) {
-      throw new BadRequestException('startTime must be before endTime.');
+      throw badRequestBusinessError(
+        'INVALID_TIME_WINDOW',
+        'startTime must be before endTime.',
+      );
     }
     if (start.getTime() < Date.now()) {
-      throw new BadRequestException(
+      throw badRequestBusinessError(
+        'INVALID_TIME_WINDOW',
         'startTime must be in the future for publishable availability.',
       );
     }
@@ -291,7 +308,8 @@ export class AvailabilitySlotsService {
     });
 
     if (overlap) {
-      throw new BadRequestException(
+      throw badRequestBusinessError(
+        'SLOT_UNAVAILABLE',
         'Slot overlaps an existing availability window for this therapist.',
       );
     }

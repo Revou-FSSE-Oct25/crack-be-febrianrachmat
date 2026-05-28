@@ -37,10 +37,13 @@ import { CalendarBookingsQueryDto } from './dto/calendar-bookings-query.dto';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { CreateConsultationDto } from './dto/create-consultation.dto';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
+import { ListBookingsQueryDto } from './dto/list-bookings-query.dto';
+import { ListConsultationsQueryDto } from './dto/list-consultations-query.dto';
 import { RefundTransactionDto } from './dto/refund-transaction.dto';
 import { RescheduleBookingDto } from './dto/reschedule-booking.dto';
 import { UpdateBookingStatusDto } from './dto/update-booking-status.dto';
 import { UpdateConsultationStatusDto } from './dto/update-consultation-status.dto';
+import { badRequestBusinessError } from '../common/errors/business-error';
 
 @Injectable()
 export class BookingsService {
@@ -145,9 +148,20 @@ export class BookingsService {
     return consultation;
   }
 
-  async listMyConsultations(authUser: AuthUser, query: PaginationQueryDto) {
+  async listMyConsultations(authUser: AuthUser, query: ListConsultationsQueryDto) {
     const skip = (query.page - 1) * query.limit;
     const take = query.limit;
+    const orderBy =
+      query.sort === 'createdAt_asc' ? { createdAt: 'asc' as const } : { createdAt: 'desc' as const };
+    const createdAtFilter =
+      query.from || query.to
+        ? {
+            createdAt: {
+              ...(query.from && { gte: new Date(query.from) }),
+              ...(query.to && { lte: new Date(query.to) }),
+            },
+          }
+        : {};
 
     if (authUser.role === UserRole.PATIENT) {
       const patient = await this.prisma.patientProfile.findUnique({
@@ -157,8 +171,12 @@ export class BookingsService {
         throw new BadRequestException('Patient profile not found.');
       }
       return this.prisma.consultation.findMany({
-        where: { patientId: patient.id },
-        orderBy: { createdAt: 'desc' },
+        where: {
+          patientId: patient.id,
+          ...(query.status && { status: query.status }),
+          ...createdAtFilter,
+        },
+        orderBy,
         skip,
         take,
       });
@@ -172,15 +190,23 @@ export class BookingsService {
         throw new BadRequestException('Physiotherapist profile not found.');
       }
       return this.prisma.consultation.findMany({
-        where: { physiotherapistId: therapist.id },
-        orderBy: { createdAt: 'desc' },
+        where: {
+          physiotherapistId: therapist.id,
+          ...(query.status && { status: query.status }),
+          ...createdAtFilter,
+        },
+        orderBy,
         skip,
         take,
       });
     }
 
     return this.prisma.consultation.findMany({
-      orderBy: { createdAt: 'desc' },
+      where: {
+        ...(query.status && { status: query.status }),
+        ...createdAtFilter,
+      },
+      orderBy,
       skip,
       take,
     });
@@ -213,7 +239,7 @@ export class BookingsService {
         where: { userId: authUser.sub },
       });
       if (!therapist || therapist.id !== consultation.physiotherapistId) {
-        throw new ForbiddenException('You can only update your own consultations.');
+        throw new NotFoundException('Consultation not found.');
       }
       // Therapist can accept a fresh request, mark a paid session complete,
       // or cancel before payment. They cannot directly set IN_PROGRESS.
@@ -230,7 +256,7 @@ export class BookingsService {
         where: { userId: authUser.sub },
       });
       if (!patient || patient.id !== consultation.patientId) {
-        throw new ForbiddenException('You can only update your own consultations.');
+        throw new NotFoundException('Consultation not found.');
       }
       // Patient can cancel anytime before completion, or mark the active
       // session complete once it's already in progress.
@@ -395,10 +421,16 @@ export class BookingsService {
         throw new BadRequestException('slotId is invalid for selected physiotherapist.');
       }
       if (!slot.isAvailable) {
-        throw new BadRequestException('Selected slot is no longer available.');
+        throw badRequestBusinessError(
+          'SLOT_UNAVAILABLE',
+          'Selected slot is no longer available.',
+        );
       }
       if (slot.endTime <= new Date()) {
-        throw new BadRequestException('Selected slot has already passed.');
+        throw badRequestBusinessError(
+          'SLOT_UNAVAILABLE',
+          'Selected slot has already passed.',
+        );
       }
       if (
         appointmentDate &&
@@ -430,7 +462,8 @@ export class BookingsService {
           data: { isAvailable: false },
         });
         if (claimed.count !== 1) {
-          throw new BadRequestException(
+          throw badRequestBusinessError(
+            'SLOT_UNAVAILABLE',
             'Selected slot is no longer available. Please choose another time.',
           );
         }
@@ -675,9 +708,26 @@ export class BookingsService {
     };
   }
 
-  async listMyBookings(authUser: AuthUser, query: PaginationQueryDto) {
+  async listMyBookings(authUser: AuthUser, query: ListBookingsQueryDto) {
     const skip = (query.page - 1) * query.limit;
     const take = query.limit;
+    const orderBy =
+      query.sort === 'appointmentDate_asc'
+        ? { appointmentDate: 'asc' as const }
+        : query.sort === 'createdAt_desc'
+          ? { createdAt: 'desc' as const }
+          : query.sort === 'createdAt_asc'
+            ? { createdAt: 'asc' as const }
+            : { appointmentDate: 'desc' as const };
+    const appointmentFilter =
+      query.from || query.to
+        ? {
+            appointmentDate: {
+              ...(query.from && { gte: new Date(query.from) }),
+              ...(query.to && { lte: new Date(query.to) }),
+            },
+          }
+        : {};
 
     if (authUser.role === UserRole.PATIENT) {
       const patient = await this.prisma.patientProfile.findUnique({
@@ -685,8 +735,12 @@ export class BookingsService {
       });
       if (!patient) throw new BadRequestException('Patient profile not found.');
       return this.prisma.booking.findMany({
-        where: { patientId: patient.id },
-        orderBy: { appointmentDate: 'desc' },
+        where: {
+          patientId: patient.id,
+          ...(query.status && { status: query.status }),
+          ...appointmentFilter,
+        },
+        orderBy,
         skip,
         take,
       });
@@ -697,14 +751,22 @@ export class BookingsService {
       });
       if (!therapist) throw new BadRequestException('Physiotherapist profile not found.');
       return this.prisma.booking.findMany({
-        where: { physiotherapistId: therapist.id },
-        orderBy: { appointmentDate: 'desc' },
+        where: {
+          physiotherapistId: therapist.id,
+          ...(query.status && { status: query.status }),
+          ...appointmentFilter,
+        },
+        orderBy,
         skip,
         take,
       });
     }
     return this.prisma.booking.findMany({
-      orderBy: { appointmentDate: 'desc' },
+      where: {
+        ...(query.status && { status: query.status }),
+        ...appointmentFilter,
+      },
+      orderBy,
       skip,
       take,
     });
@@ -726,7 +788,7 @@ export class BookingsService {
         where: { userId: authUser.sub },
       });
       if (!therapist || therapist.id !== booking.physiotherapistId) {
-        throw new ForbiddenException('You can only update your own bookings.');
+        throw new NotFoundException('Booking not found.');
       }
       const allowed: BookingStatus[] = [
         BookingStatus.CONFIRMED,
@@ -741,7 +803,7 @@ export class BookingsService {
         where: { userId: authUser.sub },
       });
       if (!patient || patient.id !== booking.patientId) {
-        throw new ForbiddenException('You can only update your own bookings.');
+        throw new NotFoundException('Booking not found.');
       }
       if (dto.status !== BookingStatus.CANCELLED) {
         throw new BadRequestException('Patient can only cancel booking.');
@@ -816,7 +878,8 @@ export class BookingsService {
       booking.status === BookingStatus.COMPLETED ||
       booking.status === BookingStatus.CANCELLED
     ) {
-      throw new BadRequestException(
+      throw badRequestBusinessError(
+        'BOOKING_LOCKED',
         'Booking can only be rescheduled while still pending confirmation.',
       );
     }
@@ -826,14 +889,14 @@ export class BookingsService {
         where: { userId: authUser.sub },
       });
       if (!patient || patient.id !== booking.patientId) {
-        throw new ForbiddenException('You can only reschedule your own bookings.');
+        throw new NotFoundException('Booking not found.');
       }
     } else if (authUser.role === UserRole.PHYSIOTHERAPIST) {
       const therapist = await this.prisma.physiotherapistProfile.findUnique({
         where: { userId: authUser.sub },
       });
       if (!therapist || therapist.id !== booking.physiotherapistId) {
-        throw new ForbiddenException('You can only reschedule your own bookings.');
+        throw new NotFoundException('Booking not found.');
       }
     } else if (authUser.role !== UserRole.ADMIN) {
       throw new ForbiddenException('Unauthorized role.');
@@ -851,10 +914,16 @@ export class BookingsService {
         throw new BadRequestException('slotId is invalid for this booking therapist.');
       }
       if (!slot.isAvailable) {
-        throw new BadRequestException('Selected slot is no longer available.');
+        throw badRequestBusinessError(
+          'SLOT_UNAVAILABLE',
+          'Selected slot is no longer available.',
+        );
       }
       if (slot.startTime <= now) {
-        throw new BadRequestException('Selected slot has already started or passed.');
+        throw badRequestBusinessError(
+          'SLOT_UNAVAILABLE',
+          'Selected slot has already started or passed.',
+        );
       }
       if (
         dto.appointmentDate &&
@@ -899,7 +968,8 @@ export class BookingsService {
           data: { isAvailable: false },
         });
         if (claimed.count !== 1) {
-          throw new BadRequestException(
+          throw badRequestBusinessError(
+            'SLOT_UNAVAILABLE',
             'Selected slot is no longer available. Please choose another time.',
           );
         }
@@ -1116,10 +1186,14 @@ export class BookingsService {
       throw new NotFoundException('Transaction not found.');
     }
     if (transaction.status !== TransactionStatus.PENDING) {
-      throw new BadRequestException('Only pending transaction can be marked as paid.');
+      throw badRequestBusinessError(
+        'TRANSACTION_STATE_INVALID',
+        'Only pending transaction can be marked as paid.',
+      );
     }
     if (!transaction.paymentProofUrl?.trim()) {
-      throw new BadRequestException(
+      throw badRequestBusinessError(
+        'PAYMENT_PROOF_REQUIRED',
         'Cannot confirm payment: no payment proof is attached to this transaction.',
       );
     }
@@ -1227,7 +1301,10 @@ export class BookingsService {
     });
     if (!transaction) throw new NotFoundException('Transaction not found.');
     if (transaction.status !== TransactionStatus.PAID) {
-      throw new BadRequestException('Only paid transaction can be refunded.');
+      throw badRequestBusinessError(
+        'TRANSACTION_STATE_INVALID',
+        'Only paid transaction can be refunded.',
+      );
     }
 
     const updated = await this.prisma.$transaction(async (tx) => {
@@ -1435,9 +1512,7 @@ export class BookingsService {
         where: { userId: authUser.sub },
       });
       if (!patient || patient.id !== transaction.patientId) {
-        throw new ForbiddenException(
-          'You can only view payment proofs for your own transactions.',
-        );
+        throw new NotFoundException('Transaction not found.');
       }
     } else if (authUser.role !== UserRole.ADMIN) {
       throw new ForbiddenException(

@@ -1,5 +1,6 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { notFoundBusinessError } from '../common/errors/business-error';
 import { AuthUser } from '../common/types/auth-user.type';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdatePatientProfileDto } from './dto/update-patient-profile.dto';
@@ -21,7 +22,10 @@ export class PatientsService {
     });
 
     if (!profile) {
-      throw new NotFoundException('Patient profile not found.');
+      throw notFoundBusinessError(
+        'PATIENT_PROFILE_NOT_FOUND',
+        'Patient profile not found.',
+      );
     }
 
     return profile;
@@ -33,7 +37,10 @@ export class PatientsService {
     });
 
     if (!existing) {
-      throw new NotFoundException('Patient profile not found.');
+      throw notFoundBusinessError(
+        'PATIENT_PROFILE_NOT_FOUND',
+        'Patient profile not found.',
+      );
     }
 
     const data: Prisma.PatientProfileUpdateInput = {

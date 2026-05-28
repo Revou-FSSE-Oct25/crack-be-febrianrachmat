@@ -48,6 +48,52 @@ export class BrowsePhysiotherapistsQueryDto {
   minRating?: number;
 
   @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  minExperienceYears?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  minVisitFee?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  maxVisitFee?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  minConsultationFee?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  maxConsultationFee?: number;
+
+  /** UTC day-of-week for availability slot: 0=Sunday ... 6=Saturday */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(6)
+  availableDay?: number;
+
+  /** UTC hour for availability slot startTime: 0..23 */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(23)
+  availableHour?: number;
+
+  @IsOptional()
   @IsIn([...BROWSE_SORT_VALUES])
   sort?: (typeof BROWSE_SORT_VALUES)[number];
 

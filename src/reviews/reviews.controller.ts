@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   Query,
@@ -13,9 +14,9 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { UserRole } from '@prisma/client';
 import { Request } from 'express';
 import { Roles } from '../auth/decorators/roles.decorator';
-import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { AuthUser } from '../common/types/auth-user.type';
 import { CreateReviewDto } from './dto/create-review.dto';
+import { ListReviewsQueryDto } from './dto/list-reviews-query.dto';
 import { ModerateReviewDto } from './dto/moderate-review.dto';
 import { UpdateReviewDto } from './dto/update-review.dto';
 import { ReviewsService } from './reviews.service';
@@ -38,7 +39,7 @@ export class ReviewsController {
   @Roles(UserRole.ADMIN, UserRole.PATIENT, UserRole.PHYSIOTHERAPIST)
   @Get('reviews/me')
   @ApiOperation({ summary: 'List reviews by current actor' })
-  listMyReviews(@Req() req: Request, @Query() query: PaginationQueryDto) {
+  listMyReviews(@Req() req: Request, @Query() query: ListReviewsQueryDto) {
     return this.reviewsService.listMyReviews(req.user as AuthUser, query);
   }
 
@@ -46,8 +47,8 @@ export class ReviewsController {
   @Get('physiotherapists/:physiotherapistId/reviews')
   @ApiOperation({ summary: 'List public reviews for physiotherapist' })
   listPublicReviews(
-    @Param('physiotherapistId') physiotherapistId: string,
-    @Query() query: PaginationQueryDto,
+    @Param('physiotherapistId', ParseUUIDPipe) physiotherapistId: string,
+    @Query() query: ListReviewsQueryDto,
   ) {
     return this.reviewsService.listPublicReviewsByPhysiotherapist(
       physiotherapistId,
@@ -60,7 +61,7 @@ export class ReviewsController {
   @ApiOperation({ summary: 'Update own review (rating and/or comment)' })
   updateMyReview(
     @Req() req: Request,
-    @Param('reviewId') reviewId: string,
+    @Param('reviewId', ParseUUIDPipe) reviewId: string,
     @Body() dto: UpdateReviewDto,
   ) {
     return this.reviewsService.updateMyReview(
@@ -73,7 +74,10 @@ export class ReviewsController {
   @Roles(UserRole.PATIENT)
   @Delete('reviews/:reviewId')
   @ApiOperation({ summary: 'Delete own review' })
-  deleteMyReview(@Req() req: Request, @Param('reviewId') reviewId: string) {
+  deleteMyReview(
+    @Req() req: Request,
+    @Param('reviewId', ParseUUIDPipe) reviewId: string,
+  ) {
     return this.reviewsService.deleteMyReview(req.user as AuthUser, reviewId);
   }
 
@@ -82,7 +86,7 @@ export class ReviewsController {
   @ApiOperation({ summary: 'Moderate review visibility (admin)' })
   moderateReview(
     @Req() req: Request,
-    @Param('reviewId') reviewId: string,
+    @Param('reviewId', ParseUUIDPipe) reviewId: string,
     @Body() dto: ModerateReviewDto,
   ) {
     return this.reviewsService.moderateReview(
