@@ -253,8 +253,8 @@ export class AdminDashboardService {
           status: BookingStatus.COMPLETED,
           appointmentDate: { gte: since },
         },
-        _count: { _all: true },
-        orderBy: { _count: { _all: 'desc' } },
+        _count: { physiotherapistId: true },
+        orderBy: { _count: { physiotherapistId: 'desc' } },
         take: 5,
       }),
     ]);
@@ -383,7 +383,7 @@ export class AdminDashboardService {
         (row) => ({
           physiotherapistId: row.physiotherapistId,
           fullName: nameById.get(row.physiotherapistId) ?? 'Unknown',
-          completedBookingCount: row._count._all,
+          completedBookingCount: row._count.physiotherapistId,
         }),
       ),
       auditLogsInPeriod: auditInPeriod,
