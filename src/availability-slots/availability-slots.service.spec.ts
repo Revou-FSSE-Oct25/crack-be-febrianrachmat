@@ -91,6 +91,23 @@ describe('AvailabilitySlotsService', () => {
     ).rejects.toThrow(BadRequestException);
   });
 
+  it('rejects create when startTime is in the past', async () => {
+    prismaMock.physiotherapistProfile.findUnique.mockResolvedValue({
+      id: 'therapist-profile-1',
+    });
+
+    await expect(
+      service.createMine(
+        THERAPIST_USER,
+        {
+          slotDate: '2020-01-01',
+          startTime: '2020-01-01T09:00:00.000Z',
+          endTime: '2020-01-01T10:00:00.000Z',
+        },
+      ),
+    ).rejects.toThrow(BadRequestException);
+  });
+
   // updateMine / removeMine guards
   it('blocks slot window update when active booking exists', async () => {
     prismaMock.physiotherapistProfile.findUnique.mockResolvedValue({
@@ -281,7 +298,7 @@ describe('AvailabilitySlotsService', () => {
         },
       }),
     );
-    expect(findManyCallArg.where.endTime).toEqual(
+    expect(findManyCallArg.where.startTime).toEqual(
       expect.objectContaining({ gte: expect.any(Date) }),
     );
     expect(result).toEqual({

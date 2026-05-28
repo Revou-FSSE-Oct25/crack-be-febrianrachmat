@@ -9,6 +9,7 @@ describe('BookingsController', () => {
     createBooking: jest.fn(),
     listMyBookings: jest.fn(),
     updateBookingStatus: jest.fn(),
+    rescheduleBooking: jest.fn(),
     createTransaction: jest.fn(),
     triggerAppointmentReminderScanByAdmin: jest.fn(),
     getLastAppointmentReminderScanStatus: jest.fn(),
@@ -71,6 +72,19 @@ describe('BookingsController', () => {
     await controller.updateBookingStatus(REQ as never, 'booking-1', dto as never);
 
     expect(bookingsServiceMock.updateBookingStatus).toHaveBeenCalledWith(
+      PATIENT_USER,
+      'booking-1',
+      dto,
+    );
+  });
+
+  it('delegates rescheduleBooking with req.user, bookingId, and dto', async () => {
+    const dto = { appointmentDate: '2099-06-03T09:00:00.000Z' };
+    bookingsServiceMock.rescheduleBooking.mockResolvedValue({ id: 'booking-1' });
+
+    await controller.rescheduleBooking(REQ as never, 'booking-1', dto as never);
+
+    expect(bookingsServiceMock.rescheduleBooking).toHaveBeenCalledWith(
       PATIENT_USER,
       'booking-1',
       dto,

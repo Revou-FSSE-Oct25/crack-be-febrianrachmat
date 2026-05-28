@@ -16,7 +16,7 @@ describe('BookingsService', () => {
       findMany: jest.fn(),
       update: jest.fn(),
     },
-    availabilitySlot: { findUnique: jest.fn(), updateMany: jest.fn() },
+    availabilitySlot: { findUnique: jest.fn(), updateMany: jest.fn(), update: jest.fn() },
     booking: { findUnique: jest.fn(), findMany: jest.fn(), update: jest.fn() },
     transaction: {
       findUnique: jest.fn(),
@@ -268,6 +268,77 @@ describe('BookingsService', () => {
       where: { id: 'slot-1' },
       data: { isAvailable: true },
     });
+  });
+
+  it('reschedules booking to a new slot and releases previous slot', async () => {
+    prismaMock.booking.findUnique.mockResolvedValue({
+      id: 'booking-1',
+      patientId: 'patient-1',
+      physiotherapistId: 'therapist-1',
+      slotId: 'slot-old',
+      status: BookingStatus.PENDING,
+    });
+    prismaMock.patientProfile.findUnique
+      .mockResolvedValueOnce({ id: 'patient-1' })
+      .mockResolvedValueOnce({ userId: 'patient-user-1' });
+    prismaMock.availabilitySlot.findUnique.mockResolvedValue({
+      id: 'slot-new',
+      physiotherapistId: 'therapist-1',
+      isAvailable: true,
+      startTime: new Date('2099-06-10T09:00:00.000Z'),
+      endTime: new Date('2099-06-10T10:00:00.000Z'),
+    });
+
+    const txSlotClaim = jest.fn().mockResolvedValue({ count: 1 });
+    const txSlotRelease = jest.fn().mockResolvedValue({ id: 'slot-old' });
+    const txBookingUpdate = jest.fn().mockResolvedValue({ id: 'booking-1' });
+    prismaMock.$transaction.mockImplementation(
+      async (cb: (tx: any) => Promise<any>) =>
+        cb({
+          availabilitySlot: { updateMany: txSlotClaim, update: txSlotRelease },
+          booking: { update: txBookingUpdate },
+        }),
+    );
+
+    await service.rescheduleBooking(PATIENT_USER, 'booking-1', {
+      slotId: 'slot-new',
+    });
+
+    expect(txSlotClaim).toHaveBeenCalledWith({
+      where: {
+        id: 'slot-new',
+        physiotherapistId: 'therapist-1',
+        isAvailable: true,
+      },
+      data: { isAvailable: false },
+    });
+    expect(txSlotRelease).toHaveBeenCalledWith({
+      where: { id: 'slot-old' },
+      data: { isAvailable: true },
+    });
+    expect(txBookingUpdate).toHaveBeenCalledWith({
+      where: { id: 'booking-1' },
+      data: {
+        slotId: 'slot-new',
+        appointmentDate: new Date('2099-06-10T09:00:00.000Z'),
+      },
+    });
+  });
+
+  it('rejects reschedule when booking already in progress', async () => {
+    prismaMock.booking.findUnique.mockResolvedValue({
+      id: 'booking-1',
+      patientId: 'patient-1',
+      physiotherapistId: 'therapist-1',
+      slotId: 'slot-old',
+      status: BookingStatus.IN_PROGRESS,
+    });
+
+    await expect(
+      service.rescheduleBooking(PATIENT_USER, 'booking-1', {
+        appointmentDate: '2099-06-11T09:00:00.000Z',
+      }),
+    ).rejects.toThrow(BadRequestException);
   });
 
   it('rejects booking when consultation therapist mismatches selected physiotherapist', async () => {

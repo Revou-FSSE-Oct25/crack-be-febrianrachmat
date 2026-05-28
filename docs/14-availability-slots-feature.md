@@ -10,7 +10,8 @@ Therapists publish time windows; patients pick a `slotId` when creating a bookin
 
 - **`slotDate`** must match the **UTC calendar day** of **`startTime`** and **`endTime`** (all ISO 8601 strings).
 - **Overlap**: a therapist cannot create or move a slot so its `[startTime, endTime)` overlaps another slot for the same therapist.
-- **Public list**: only **approved** therapists; only slots with `isAvailable: true` and **`endTime >= now`**.
+- **Create/update window**: `startTime` must be in the future (cannot publish or move slot to a past start).
+- **Public list**: only **approved** therapists; only slots with `isAvailable: true` and **`startTime >= now`**.
 - **Active booking** (status ≠ `CANCELLED`): therapist cannot change slot times, cannot mark `isAvailable: true`, cannot delete the slot.
 
 ## Endpoints

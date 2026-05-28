@@ -179,7 +179,7 @@ export class AvailabilitySlotsService {
     const where = {
       physiotherapistId: profileId,
       isAvailable: true,
-      endTime: { gte: now },
+      startTime: { gte: now },
       ...this.buildSlotDateSpanWhere(query),
     };
 
@@ -255,6 +255,11 @@ export class AvailabilitySlotsService {
     }
     if (start >= end) {
       throw new BadRequestException('startTime must be before endTime.');
+    }
+    if (start.getTime() < Date.now()) {
+      throw new BadRequestException(
+        'startTime must be in the future for publishable availability.',
+      );
     }
 
     const slotDay = dto.slotDate.slice(0, 10);

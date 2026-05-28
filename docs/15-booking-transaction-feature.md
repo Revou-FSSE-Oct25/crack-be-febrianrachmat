@@ -113,6 +113,18 @@ If booking is cancelled, the linked slot is released back to available.
 Valid transition flow: `PENDING → CONFIRMED → IN_PROGRESS → COMPLETED`; cancel
 is only allowed before completion.
 
+### `PATCH /bookings/:bookingId/reschedule` (Roles: `ADMIN`, `PATIENT`, `PHYSIOTHERAPIST`)
+
+Reschedule a booking while it is still active for planning (`PENDING` / `CONFIRMED`).
+
+Rules:
+
+- Cannot reschedule `IN_PROGRESS`, `COMPLETED`, or `CANCELLED` bookings
+- `slotId` optional: if provided, must belong to the booking therapist, must still be available, and must start in the future
+- `appointmentDate` optional when `slotId` exists (if sent, must equal slot `startTime`)
+- Without `slotId`, `appointmentDate` is required and must be in the future
+- Slot reassignment is atomic: claim new slot first, then release old slot
+
 ---
 
 ## Dummy Transaction Endpoints

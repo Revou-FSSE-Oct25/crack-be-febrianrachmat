@@ -32,6 +32,7 @@ import { CreateBookingDto } from './dto/create-booking.dto';
 import { CreateConsultationDto } from './dto/create-consultation.dto';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
 import { RefundTransactionDto } from './dto/refund-transaction.dto';
+import { RescheduleBookingDto } from './dto/reschedule-booking.dto';
 import { UpdateBookingStatusDto } from './dto/update-booking-status.dto';
 import { UpdateConsultationStatusDto } from './dto/update-consultation-status.dto';
 import {
@@ -118,6 +119,21 @@ export class BookingsController {
     @Body() dto: UpdateBookingStatusDto,
   ) {
     return this.bookingsService.updateBookingStatus(
+      req.user as AuthUser,
+      bookingId,
+      dto,
+    );
+  }
+
+  @Roles(UserRole.ADMIN, UserRole.PATIENT, UserRole.PHYSIOTHERAPIST)
+  @Patch('bookings/:bookingId/reschedule')
+  @ApiOperation({ summary: 'Reschedule booking to another time/slot' })
+  rescheduleBooking(
+    @Req() req: Request,
+    @Param('bookingId') bookingId: string,
+    @Body() dto: RescheduleBookingDto,
+  ) {
+    return this.bookingsService.rescheduleBooking(
       req.user as AuthUser,
       bookingId,
       dto,

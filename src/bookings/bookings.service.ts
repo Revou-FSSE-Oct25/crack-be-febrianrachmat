@@ -38,6 +38,7 @@ import { CreateBookingDto } from './dto/create-booking.dto';
 import { CreateConsultationDto } from './dto/create-consultation.dto';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
 import { RefundTransactionDto } from './dto/refund-transaction.dto';
+import { RescheduleBookingDto } from './dto/reschedule-booking.dto';
 import { UpdateBookingStatusDto } from './dto/update-booking-status.dto';
 import { UpdateConsultationStatusDto } from './dto/update-consultation-status.dto';
 
@@ -794,6 +795,142 @@ export class BookingsService {
           `Your booking status is now ${dto.status}.`,
         );
       }
+    }
+
+    return updated;
+  }
+
+  async rescheduleBooking(
+    authUser: AuthUser,
+    bookingId: string,
+    dto: RescheduleBookingDto,
+  ) {
+    const booking = await this.prisma.booking.findUnique({
+      where: { id: bookingId },
+    });
+    if (!booking) {
+      throw new NotFoundException('Booking not found.');
+    }
+    if (
+      booking.status === BookingStatus.IN_PROGRESS ||
+      booking.status === BookingStatus.COMPLETED ||
+      booking.status === BookingStatus.CANCELLED
+    ) {
+      throw new BadRequestException(
+        'Booking can only be rescheduled while still pending confirmation.',
+      );
+    }
+
+    if (authUser.role === UserRole.PATIENT) {
+      const patient = await this.prisma.patientProfile.findUnique({
+        where: { userId: authUser.sub },
+      });
+      if (!patient || patient.id !== booking.patientId) {
+        throw new ForbiddenException('You can only reschedule your own bookings.');
+      }
+    } else if (authUser.role === UserRole.PHYSIOTHERAPIST) {
+      const therapist = await this.prisma.physiotherapistProfile.findUnique({
+        where: { userId: authUser.sub },
+      });
+      if (!therapist || therapist.id !== booking.physiotherapistId) {
+        throw new ForbiddenException('You can only reschedule your own bookings.');
+      }
+    } else if (authUser.role !== UserRole.ADMIN) {
+      throw new ForbiddenException('Unauthorized role.');
+    }
+
+    const now = new Date();
+    let nextAppointmentDate: Date;
+    let nextSlotId: string | null;
+
+    if (dto.slotId) {
+      const slot = await this.prisma.availabilitySlot.findUnique({
+        where: { id: dto.slotId },
+      });
+      if (!slot || slot.physiotherapistId !== booking.physiotherapistId) {
+        throw new BadRequestException('slotId is invalid for this booking therapist.');
+      }
+      if (!slot.isAvailable) {
+        throw new BadRequestException('Selected slot is no longer available.');
+      }
+      if (slot.startTime <= now) {
+        throw new BadRequestException('Selected slot has already started or passed.');
+      }
+      if (
+        dto.appointmentDate &&
+        (() => {
+          const provided = new Date(dto.appointmentDate as string);
+          if (Number.isNaN(provided.getTime())) {
+            throw new BadRequestException('appointmentDate is invalid.');
+          }
+          return provided.getTime() !== slot.startTime.getTime();
+        })()
+      ) {
+        throw new BadRequestException(
+          'appointmentDate must equal slot startTime when slotId is provided.',
+        );
+      }
+      nextAppointmentDate = slot.startTime;
+      nextSlotId = slot.id;
+    } else {
+      if (!dto.appointmentDate) {
+        throw new BadRequestException(
+          'appointmentDate is required when slotId is not provided.',
+        );
+      }
+      nextAppointmentDate = new Date(dto.appointmentDate);
+      if (Number.isNaN(nextAppointmentDate.getTime())) {
+        throw new BadRequestException('appointmentDate is invalid.');
+      }
+      if (nextAppointmentDate <= now) {
+        throw new BadRequestException('appointmentDate must be in the future.');
+      }
+      nextSlotId = null;
+    }
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      if (nextSlotId) {
+        const claimed = await tx.availabilitySlot.updateMany({
+          where: {
+            id: nextSlotId,
+            physiotherapistId: booking.physiotherapistId,
+            isAvailable: true,
+          },
+          data: { isAvailable: false },
+        });
+        if (claimed.count !== 1) {
+          throw new BadRequestException(
+            'Selected slot is no longer available. Please choose another time.',
+          );
+        }
+      }
+
+      if (booking.slotId && booking.slotId !== nextSlotId) {
+        await tx.availabilitySlot.update({
+          where: { id: booking.slotId },
+          data: { isAvailable: true },
+        });
+      }
+
+      return tx.booking.update({
+        where: { id: bookingId },
+        data: {
+          slotId: nextSlotId,
+          appointmentDate: nextAppointmentDate,
+        },
+      });
+    });
+
+    const patient = await this.prisma.patientProfile.findUnique({
+      where: { id: booking.patientId },
+      select: { userId: true },
+    });
+    if (patient) {
+      await this.safeNotify(
+        patient.userId,
+        'Booking Rescheduled',
+        `Your booking has been rescheduled to ${nextAppointmentDate.toISOString()}.`,
+      );
     }
 
     return updated;
