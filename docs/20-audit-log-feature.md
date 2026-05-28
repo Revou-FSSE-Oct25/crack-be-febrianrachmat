@@ -21,6 +21,7 @@ Persisted audit trail in PostgreSQL for sensitive admin and system actions.
 - `TRANSACTION_MARK_PAID` — admin confirms dummy payment
 - `TRANSACTION_REFUND` — admin manual refund
 - `TRANSACTION_SLA_AUTO_REFUND` — cron SLA auto-refund
+- `APPOINTMENT_REMINDER_MANUAL_SCAN` — admin manual trigger scan reminder booking
 - `REVIEW_MODERATE` — admin hide/unhide review
 - `PHYSIOTHERAPIST_VERIFY` — admin approve/reject therapist
 - `NOTIFICATION_BROADCAST` — admin broadcast to all users
@@ -42,7 +43,7 @@ Response includes `actor` summary (`fullName`, `email`, `role`) when `actorUserI
 
 `AuditService.record()` is called from:
 
-- `BookingsService` — mark paid, refund, SLA auto-refund
+- `BookingsService` — mark paid, refund, SLA auto-refund, manual reminder scan
 - `ReviewsService` — review moderation
 - `PhysiotherapistsService` — therapist verification
 - `NotificationsService` — admin send/broadcast
