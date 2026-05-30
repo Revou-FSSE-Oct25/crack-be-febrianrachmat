@@ -1,0 +1,21 @@
+{
+  "isString": "{property} must be a string.",
+  "isNotEmpty": "{property} must not be empty.",
+  "isEmail": "{property} must be a valid email address.",
+  "isEnum": "{property} has an invalid value.",
+  "isInt": "{property} must be an integer.",
+  "isNumber": "{property} must be a number.",
+  "isBoolean": "{property} must be a boolean.",
+  "isDateString": "{property} must be a valid ISO date string.",
+  "isUrl": "{property} must be a valid URL.",
+  "isUuid": "{property} must be a valid UUID.",
+  "minLength": "{property} is too short.",
+  "maxLength": "{property} is too long.",
+  "min": "{property} is below the allowed minimum.",
+  "max": "{property} is above the allowed maximum.",
+  "matches": "{property} has an invalid format.",
+  "isPositive": "{property} must be a positive number.",
+  "isArray": "{property} must be an array.",
+  "arrayNotEmpty": "{property} must not be empty.",
+  "whitelistValidation": "{property} is not allowed."
+}

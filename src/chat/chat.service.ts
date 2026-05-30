@@ -59,6 +59,11 @@ export class ChatService {
       throw badRequestBusinessError(
         'CHAT_LOCKED',
         `Chat is locked. Consultation must be IN_PROGRESS (current: ${consultation.status}).`,
+        undefined,
+        {
+          messageKey: 'errors.CHAT_LOCKED_INPROGRESS',
+          messageArgs: { status: consultation.status },
+        },
       );
     }
 
@@ -298,6 +303,11 @@ export class ChatService {
           `Chat is locked. Consultation must be IN_PROGRESS (current: ${
             consultation?.status ?? 'UNKNOWN'
           }).`,
+          undefined,
+          {
+            messageKey: 'errors.CHAT_LOCKED_INPROGRESS',
+            messageArgs: { status: consultation?.status ?? 'UNKNOWN' },
+          },
         );
       }
     }

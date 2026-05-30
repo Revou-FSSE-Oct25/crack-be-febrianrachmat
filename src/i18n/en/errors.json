@@ -1,0 +1,6 @@
+{
+  "FAST_RESPONSE_ONLINE_ONLY": "Fast response is only available while the therapist is online (active heartbeat). Open the physiotherapist list, make sure the Online badge is shown, then submit again.",
+  "PAYMENT_PROOF_ATTACH": "Attach a payment proof: upload an image (JPEG, PNG, or WebP) or provide an https link to your proof.",
+  "SOCIAL_DEACTIVATE": "This account signs in via Google/Apple/GitHub/Facebook. Deactivate it through the sign-in provider or contact support.",
+  "SOCIAL_PASSWORD_UNAVAILABLE": "This account signs in via Google/Apple/GitHub/Facebook. Setting a password is not available for this account yet."
+}

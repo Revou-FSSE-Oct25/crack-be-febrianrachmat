@@ -1,4 +1,8 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 
 export type BusinessErrorCode =
   | 'SLOT_UNAVAILABLE'
@@ -27,28 +31,69 @@ export type BusinessErrorCode =
   | 'AVATAR_PATH_INVALID'
   | 'ACCOUNT_STATE_INVALID'
   | 'PASSWORD_CHANGE_INVALID'
-  | 'PASSWORD_UNAVAILABLE';
+  | 'PASSWORD_UNAVAILABLE'
+  | 'INVALID_CREDENTIALS'
+  | 'SOCIAL_LOGIN_ONLY'
+  | 'ACCOUNT_INACTIVE'
+  | 'CONSULTATION_STATE_INVALID'
+  | 'BOOKING_STATE_INVALID';
+
+/**
+ * Optional i18n hint. When present, the global exception filter resolves
+ * `messageKey` against the request language and uses the result as the response
+ * message; `message` remains the (English) fallback when no translation exists.
+ */
+export type ErrorI18n = {
+  messageKey?: string;
+  messageArgs?: Record<string, unknown>;
+};
 
 type ErrorPayload = {
   message: string;
   errorCode: BusinessErrorCode;
   details?: Record<string, unknown>;
+  messageKey?: string;
+  messageArgs?: Record<string, unknown>;
 };
+
+function buildPayload(
+  errorCode: BusinessErrorCode,
+  message: string,
+  details?: Record<string, unknown>,
+  i18n?: ErrorI18n,
+): ErrorPayload {
+  return {
+    message,
+    errorCode,
+    ...(details && { details }),
+    ...(i18n?.messageKey && { messageKey: i18n.messageKey }),
+    ...(i18n?.messageArgs && { messageArgs: i18n.messageArgs }),
+  };
+}
 
 export function badRequestBusinessError(
   errorCode: BusinessErrorCode,
   message: string,
   details?: Record<string, unknown>,
+  i18n?: ErrorI18n,
 ): BadRequestException {
-  const payload: ErrorPayload = { message, errorCode, ...(details && { details }) };
-  return new BadRequestException(payload);
+  return new BadRequestException(buildPayload(errorCode, message, details, i18n));
 }
 
 export function notFoundBusinessError(
   errorCode: BusinessErrorCode,
   message: string,
   details?: Record<string, unknown>,
+  i18n?: ErrorI18n,
 ): NotFoundException {
-  const payload: ErrorPayload = { message, errorCode, ...(details && { details }) };
-  return new NotFoundException(payload);
+  return new NotFoundException(buildPayload(errorCode, message, details, i18n));
+}
+
+export function unauthorizedBusinessError(
+  errorCode: BusinessErrorCode,
+  message: string,
+  details?: Record<string, unknown>,
+  i18n?: ErrorI18n,
+): UnauthorizedException {
+  return new UnauthorizedException(buildPayload(errorCode, message, details, i18n));
 }

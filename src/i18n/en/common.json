@@ -1,0 +1,6 @@
+{
+  "INTERNAL_SERVER_ERROR": "Internal server error",
+  "REQUEST_FAILED": "Request failed",
+  "TOO_MANY_REQUESTS": "Too many requests from this address. Please try again in a few moments.",
+  "GREETING": "Hello {name}, welcome back."
+}

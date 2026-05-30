@@ -1,9 +1,16 @@
+import * as path from 'path';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { TransformResponseInterceptor } from './common/interceptors/transform-response.interceptor';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import {
+  AcceptLanguageResolver,
+  HeaderResolver,
+  I18nModule,
+  QueryResolver,
+} from 'nestjs-i18n';
 import { AdminModule } from './admin/admin.module';
 import { AuditModule } from './audit/audit.module';
 import { AvailabilitySlotsModule } from './availability-slots/availability-slots.module';
@@ -24,6 +31,22 @@ import { UsersModule } from './users/users.module';
     // isGlobal=true lets us use environment variables anywhere without
     // repeatedly importing ConfigModule in every feature module.
     ConfigModule.forRoot({ isGlobal: true }),
+    // Internationalization. `en` stays the default so existing English API
+    // messages are unchanged; clients opt into other languages per request via
+    // `?lang=id`, an `x-lang: id` header, or the standard `Accept-Language`
+    // header (resolvers are tried in this order).
+    I18nModule.forRoot({
+      fallbackLanguage: process.env.DEFAULT_LANGUAGE ?? 'en',
+      loaderOptions: {
+        path: path.join(__dirname, '/i18n/'),
+        watch: process.env.NODE_ENV !== 'production',
+      },
+      resolvers: [
+        { use: QueryResolver, options: ['lang'] },
+        new HeaderResolver(['x-lang']),
+        AcceptLanguageResolver,
+      ],
+    }),
     ScheduleModule.forRoot(),
     ThrottlerModule.forRoot({
       throttlers: [{ name: 'default', ttl: 60_000, limit: 120 }],

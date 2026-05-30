@@ -1,12 +1,12 @@
-import {
-  Injectable,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
 import { JwtService } from '@nestjs/jwt';
 import { compare, hash } from 'bcryptjs';
 import { PrismaService } from '../prisma/prisma.service';
-import { badRequestBusinessError } from '../common/errors/business-error';
+import {
+  badRequestBusinessError,
+  unauthorizedBusinessError,
+} from '../common/errors/business-error';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { JwtPayload } from './interfaces/jwt-payload.interface';
@@ -34,6 +34,8 @@ export class AuthService {
       throw badRequestBusinessError(
         'REGISTRATION_ROLE_FORBIDDEN',
         'Public registration cannot create admin account.',
+        undefined,
+        { messageKey: 'auth.REGISTRATION_ROLE_FORBIDDEN' },
       );
     }
 
@@ -45,6 +47,8 @@ export class AuthService {
       throw badRequestBusinessError(
         'EMAIL_ALREADY_REGISTERED',
         'Email is already registered.',
+        undefined,
+        { messageKey: 'auth.EMAIL_ALREADY_REGISTERED' },
       );
     }
 
@@ -92,22 +96,40 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new UnauthorizedException('Invalid email or password.');
+      throw unauthorizedBusinessError(
+        'INVALID_CREDENTIALS',
+        'Invalid email or password.',
+        undefined,
+        { messageKey: 'auth.INVALID_CREDENTIALS' },
+      );
     }
 
     if (!user.passwordHash) {
-      throw new UnauthorizedException(
+      throw unauthorizedBusinessError(
+        'SOCIAL_LOGIN_ONLY',
         'This account uses social login. Sign in with Google, Apple, GitHub, or Facebook.',
+        undefined,
+        { messageKey: 'auth.SOCIAL_LOGIN_ONLY' },
       );
     }
 
     const isPasswordValid = await compare(dto.password, user.passwordHash);
     if (!isPasswordValid) {
-      throw new UnauthorizedException('Invalid email or password.');
+      throw unauthorizedBusinessError(
+        'INVALID_CREDENTIALS',
+        'Invalid email or password.',
+        undefined,
+        { messageKey: 'auth.INVALID_CREDENTIALS' },
+      );
     }
 
     if (!user.isActive) {
-      throw new UnauthorizedException('Your account is inactive.');
+      throw unauthorizedBusinessError(
+        'ACCOUNT_INACTIVE',
+        'Your account is inactive.',
+        undefined,
+        { messageKey: 'auth.ACCOUNT_INACTIVE' },
+      );
     }
 
     const accessToken = await this.signToken(user.id, user.email, user.role);

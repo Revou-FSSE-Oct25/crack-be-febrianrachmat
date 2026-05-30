@@ -4,7 +4,7 @@
   "description": "Backend API for physiotherapy booking management system",
   "main": "dist/main.js",
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "tsc -p tsconfig.build.json && node scripts/copy-i18n.mjs",
     "start": "node dist/main.js",
     "start:dev": "ts-node-dev --respawn --transpile-only src/main.ts",
     "start:prod": "node dist/main.js",
@@ -53,6 +53,7 @@
     "express": "^5.2.1",
     "helmet": "^8.1.0",
     "multer": "^2.0.2",
+    "nestjs-i18n": "^10.8.4",
     "passport": "^0.7.0",
     "passport-apple": "^2.0.2",
     "passport-facebook": "^3.0.0",

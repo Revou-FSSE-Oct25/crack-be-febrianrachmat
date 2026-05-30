@@ -351,14 +351,26 @@ export class BookingsService {
     nextStatus: ConsultationStatus,
   ): void {
     if (currentStatus === nextStatus) {
-      throw new BadRequestException(
+      throw badRequestBusinessError(
+        'CONSULTATION_STATE_INVALID',
         `Consultation status is already ${currentStatus}.`,
+        undefined,
+        {
+          messageKey: 'errors.CONSULTATION_STATUS_ALREADY',
+          messageArgs: { status: currentStatus },
+        },
       );
     }
     const allowed = this.allowedConsultationTransitions[currentStatus] ?? [];
     if (!allowed.includes(nextStatus)) {
-      throw new BadRequestException(
+      throw badRequestBusinessError(
+        'CONSULTATION_STATE_INVALID',
         `Invalid consultation status transition from ${currentStatus} to ${nextStatus}.`,
+        undefined,
+        {
+          messageKey: 'errors.CONSULTATION_TRANSITION_INVALID',
+          messageArgs: { from: currentStatus, to: nextStatus },
+        },
       );
     }
   }
@@ -401,8 +413,14 @@ export class BookingsService {
         );
       }
       if (consultation.status === ConsultationStatus.CANCELLED) {
-        throw new BadRequestException(
+        throw badRequestBusinessError(
+          'CONSULTATION_STATE_INVALID',
           `Cannot create booking from consultation with status ${consultation.status}.`,
+          undefined,
+          {
+            messageKey: 'errors.BOOKING_FROM_CONSULTATION_STATUS',
+            messageArgs: { status: consultation.status },
+          },
         );
       }
     }
@@ -1062,15 +1080,27 @@ export class BookingsService {
     nextStatus: BookingStatus,
   ): void {
     if (currentStatus === nextStatus) {
-      throw new BadRequestException(
+      throw badRequestBusinessError(
+        'BOOKING_STATE_INVALID',
         `Booking status is already ${currentStatus}.`,
+        undefined,
+        {
+          messageKey: 'errors.BOOKING_STATUS_ALREADY',
+          messageArgs: { status: currentStatus },
+        },
       );
     }
 
     const allowedNext = this.allowedBookingTransitions[currentStatus] ?? [];
     if (!allowedNext.includes(nextStatus)) {
-      throw new BadRequestException(
+      throw badRequestBusinessError(
+        'BOOKING_STATE_INVALID',
         `Invalid booking status transition from ${currentStatus} to ${nextStatus}.`,
+        undefined,
+        {
+          messageKey: 'errors.BOOKING_TRANSITION_INVALID',
+          messageArgs: { from: currentStatus, to: nextStatus },
+        },
       );
     }
   }
@@ -1125,8 +1155,14 @@ export class BookingsService {
           BookingStatus.COMPLETED,
         ];
         if (!payableBookingStatuses.includes(booking.status)) {
-          throw new BadRequestException(
+          throw badRequestBusinessError(
+            'BOOKING_STATE_INVALID',
             `Booking must be CONFIRMED before payment (current: ${booking.status}).`,
+            undefined,
+            {
+              messageKey: 'errors.BOOKING_CONFIRM_BEFORE_PAYMENT',
+              messageArgs: { status: booking.status },
+            },
           );
         }
 
@@ -1182,8 +1218,14 @@ export class BookingsService {
         throw new BadRequestException('Cannot pay for a cancelled consultation.');
       }
       if (consultation.status !== ConsultationStatus.ACCEPTED) {
-        throw new BadRequestException(
+        throw badRequestBusinessError(
+          'CONSULTATION_STATE_INVALID',
           `Consultation must be ACCEPTED before payment (current status: ${consultation.status}).`,
+          undefined,
+          {
+            messageKey: 'errors.CONSULTATION_ACCEPT_BEFORE_PAYMENT',
+            messageArgs: { status: consultation.status },
+          },
         );
       }
 
@@ -1269,8 +1311,14 @@ export class BookingsService {
         );
       }
       if (transaction.consultation.status !== ConsultationStatus.ACCEPTED) {
-        throw new BadRequestException(
+        throw badRequestBusinessError(
+          'CONSULTATION_STATE_INVALID',
           `Consultation must be ACCEPTED before payment confirmation (current: ${transaction.consultation.status}).`,
+          undefined,
+          {
+            messageKey: 'errors.CONSULTATION_ACCEPT_BEFORE_CONFIRM',
+            messageArgs: { status: transaction.consultation.status },
+          },
         );
       }
     }

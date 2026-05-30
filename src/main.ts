@@ -13,6 +13,7 @@ import { buildCorsOptions } from './common/security/cors-options';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './auth/guards/roles.guard';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
+import { buildI18nValidationException } from './common/validation/i18n-validation.factory';
 
 async function bootstrap(): Promise<void> {
   assertProductionCorsOrigins();
@@ -33,6 +34,7 @@ async function bootstrap(): Promise<void> {
       whitelist: true,
       forbidNonWhitelisted: true,
       transform: true,
+      exceptionFactory: buildI18nValidationException,
     }),
   );
   app.useGlobalFilters(new GlobalExceptionFilter());

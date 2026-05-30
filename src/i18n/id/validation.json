@@ -1,0 +1,21 @@
+{
+  "isString": "{property} harus berupa teks.",
+  "isNotEmpty": "{property} tidak boleh kosong.",
+  "isEmail": "{property} harus berupa alamat email yang valid.",
+  "isEnum": "{property} memiliki nilai yang tidak valid.",
+  "isInt": "{property} harus berupa bilangan bulat.",
+  "isNumber": "{property} harus berupa angka.",
+  "isBoolean": "{property} harus bernilai benar/salah (boolean).",
+  "isDateString": "{property} harus berupa tanggal ISO yang valid.",
+  "isUrl": "{property} harus berupa URL yang valid.",
+  "isUuid": "{property} harus berupa UUID yang valid.",
+  "minLength": "{property} terlalu pendek.",
+  "maxLength": "{property} terlalu panjang.",
+  "min": "{property} kurang dari nilai minimum yang diizinkan.",
+  "max": "{property} melebihi nilai maksimum yang diizinkan.",
+  "matches": "{property} memiliki format yang tidak valid.",
+  "isPositive": "{property} harus berupa angka positif.",
+  "isArray": "{property} harus berupa array.",
+  "arrayNotEmpty": "{property} tidak boleh kosong.",
+  "whitelistValidation": "{property} tidak diizinkan."
+}
