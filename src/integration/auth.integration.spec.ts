@@ -956,7 +956,7 @@ describe('Core integration (real DB, no service mocks)', () => {
       expect(res.body.error.message).toBe('Notification not found.');
     });
 
-    it("returns 403 when patient A updates patient B's booking status", async () => {
+    it("returns 404 when patient A updates patient B's booking status", async () => {
       const patientARegisterRes = await request(app.getHttpServer())
         .post('/auth/register')
         .send({
@@ -1018,14 +1018,14 @@ describe('Core integration (real DB, no service mocks)', () => {
         .patch(`/bookings/${bookingId}/status`)
         .set('Authorization', `Bearer ${patientAToken}`)
         .send({ status: 'CANCELLED' })
-        .expect(403);
+        .expect(404);
 
       expect(res.body.success).toBe(false);
-      expect(res.body.error.code).toBe(403);
-      expect(res.body.error.message).toBe('You can only update your own bookings.');
+      expect(res.body.error.code).toBe(404);
+      expect(res.body.error.message).toBe('Booking not found.');
     });
 
-    it("returns 403 when patient A cancels patient B's consultation", async () => {
+    it("returns 404 when patient A cancels patient B's consultation", async () => {
       const patientARegisterRes = await request(app.getHttpServer())
         .post('/auth/register')
         .send({
@@ -1085,13 +1085,11 @@ describe('Core integration (real DB, no service mocks)', () => {
         .patch(`/consultations/${consultationId}/status`)
         .set('Authorization', `Bearer ${patientAToken}`)
         .send({ status: 'CANCELLED' })
-        .expect(403);
+        .expect(404);
 
       expect(res.body.success).toBe(false);
-      expect(res.body.error.code).toBe(403);
-      expect(res.body.error.message).toBe(
-        'You can only update your own consultations.',
-      );
+      expect(res.body.error.code).toBe(404);
+      expect(res.body.error.message).toBe('Consultation not found.');
     });
 
     it("returns 400 when patient A creates a transaction on patient B's booking", async () => {
@@ -1170,7 +1168,7 @@ describe('Core integration (real DB, no service mocks)', () => {
       expect(res.body.error.message).toBe('Booking not found for current patient.');
     });
 
-    it("returns 403 when therapist A updates therapist B's consultation", async () => {
+    it("returns 404 when therapist A updates therapist B's consultation", async () => {
       const patientRegisterRes = await request(app.getHttpServer())
         .post('/auth/register')
         .send({
@@ -1236,14 +1234,14 @@ describe('Core integration (real DB, no service mocks)', () => {
         .patch(`/consultations/${consultationId}/status`)
         .set('Authorization', `Bearer ${therapistAToken}`)
         .send({ status: 'ACCEPTED' })
-        .expect(403);
+        .expect(404);
 
       expect(res.body.success).toBe(false);
-      expect(res.body.error.code).toBe(403);
-      expect(res.body.error.message).toBe('You can only update your own consultations.');
+      expect(res.body.error.code).toBe(404);
+      expect(res.body.error.message).toBe('Consultation not found.');
     });
 
-    it("returns 403 when therapist A updates therapist B's booking", async () => {
+    it("returns 404 when therapist A updates therapist B's booking", async () => {
       const patientRegisterRes = await request(app.getHttpServer())
         .post('/auth/register')
         .send({
@@ -1311,11 +1309,11 @@ describe('Core integration (real DB, no service mocks)', () => {
         .patch(`/bookings/${bookingId}/status`)
         .set('Authorization', `Bearer ${therapistAToken}`)
         .send({ status: 'CONFIRMED' })
-        .expect(403);
+        .expect(404);
 
       expect(res.body.success).toBe(false);
-      expect(res.body.error.code).toBe(403);
-      expect(res.body.error.message).toBe('You can only update your own bookings.');
+      expect(res.body.error.code).toBe(404);
+      expect(res.body.error.message).toBe('Booking not found.');
     });
 
     it("returns 404 when therapist A updates therapist B's availability slot", async () => {
@@ -1407,7 +1405,7 @@ describe('Core integration (real DB, no service mocks)', () => {
       expect(res.body.error.message).toBe('Availability slot not found.');
     });
 
-    it("returns 403 when non-participant patient reads another user's conversation messages", async () => {
+    it("returns 404 when non-participant patient reads another user's conversation messages", async () => {
       const patientARegisterRes = await request(app.getHttpServer())
         .post('/auth/register')
         .send({
@@ -1480,14 +1478,14 @@ describe('Core integration (real DB, no service mocks)', () => {
       const res = await request(app.getHttpServer())
         .get(`/chat/conversations/${conversationId}/messages`)
         .set('Authorization', `Bearer ${patientAToken}`)
-        .expect(403);
+        .expect(404);
 
       expect(res.body.success).toBe(false);
-      expect(res.body.error.code).toBe(403);
-      expect(res.body.error.message).toBe('You are not part of this conversation.');
+      expect(res.body.error.code).toBe(404);
+      expect(res.body.error.message).toBe('Conversation not found.');
     });
 
-    it("returns 403 when non-participant patient sends message to another user's conversation", async () => {
+    it("returns 404 when non-participant patient sends message to another user's conversation", async () => {
       const patientARegisterRes = await request(app.getHttpServer())
         .post('/auth/register')
         .send({
@@ -1560,14 +1558,14 @@ describe('Core integration (real DB, no service mocks)', () => {
         .post(`/chat/conversations/${conversationId}/messages`)
         .set('Authorization', `Bearer ${patientAToken}`)
         .send({ content: 'I should not be able to post here.' })
-        .expect(403);
+        .expect(404);
 
       expect(res.body.success).toBe(false);
-      expect(res.body.error.code).toBe(403);
-      expect(res.body.error.message).toBe('You are not part of this conversation.');
+      expect(res.body.error.code).toBe(404);
+      expect(res.body.error.message).toBe('Conversation not found.');
     });
 
-    it("returns 403 when non-participant patient creates/gets conversation using another user's consultation", async () => {
+    it("returns 404 when non-participant patient creates/gets conversation using another user's consultation", async () => {
       const patientARegisterRes = await request(app.getHttpServer())
         .post('/auth/register')
         .send({
@@ -1627,11 +1625,11 @@ describe('Core integration (real DB, no service mocks)', () => {
         .post('/chat/conversations')
         .set('Authorization', `Bearer ${patientAToken}`)
         .send({ consultationId })
-        .expect(403);
+        .expect(404);
 
       expect(res.body.success).toBe(false);
-      expect(res.body.error.code).toBe(403);
-      expect(res.body.error.message).toBe('You are not part of this consultation.');
+      expect(res.body.error.code).toBe(404);
+      expect(res.body.error.message).toBe('Consultation not found.');
     });
   });
 });
