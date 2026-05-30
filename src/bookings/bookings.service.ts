@@ -33,6 +33,7 @@ import {
   parseReminderHoursBefore,
   parseReminderWindowMinutes,
 } from './appointment-reminder.helpers';
+import { buildIcsCalendar } from '../common/ics/ics.util';
 import { CalendarBookingsQueryDto } from './dto/calendar-bookings-query.dto';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { CreateConsultationDto } from './dto/create-consultation.dto';
@@ -538,6 +539,56 @@ export class BookingsService {
       from: from.toISOString(),
       to: to.toISOString(),
       items: rows.map((row) => this.toCalendarBookingItem(row, authUser.role)),
+    };
+  }
+
+  /** Default visit block length when building iCalendar DTEND. */
+  private static readonly CALENDAR_EXPORT_EVENT_MS = 60 * 60 * 1000;
+
+  async exportMyBookingsCalendarIcs(
+    authUser: AuthUser,
+    query: CalendarBookingsQueryDto,
+  ): Promise<{ ics: string; filename: string; eventCount: number }> {
+    const calendar = await this.listMyBookingsCalendar(authUser, query);
+    const fromDate = new Date(calendar.from);
+    const stamp = `${fromDate.getFullYear()}-${String(fromDate.getMonth() + 1).padStart(2, '0')}`;
+
+    const ics = buildIcsCalendar({
+      prodId: '-//Crack Physio//Booking Calendar//ID',
+      calendarName: 'Janji temu Crack',
+      events: calendar.items.map((item) => {
+        const start = new Date(item.appointmentDate);
+        const end = new Date(
+          start.getTime() + BookingsService.CALENDAR_EXPORT_EVENT_MS,
+        );
+        const typeLabel = this.calendarAppointmentTypeLabel(
+          item.appointmentType,
+        );
+        const fee = Number(item.visitFeeSnapshot).toLocaleString('id-ID');
+        const descriptionLines = [
+          `Status: ${item.status}`,
+          `Tipe: ${typeLabel}`,
+          `Biaya: Rp ${fee}`,
+        ];
+        if (item.notes?.trim()) {
+          descriptionLines.push(`Catatan: ${item.notes.trim()}`);
+        }
+
+        return {
+          uid: `${item.id}@crack-bookings`,
+          start,
+          end,
+          summary: `${item.counterpartyName} · ${typeLabel}`,
+          location: item.locationLabel,
+          description: descriptionLines.join('\n'),
+        };
+      }),
+    });
+
+    return {
+      ics,
+      filename: `janji-temu-${stamp}.ics`,
+      eventCount: calendar.items.length,
     };
   }
 
@@ -1569,6 +1620,16 @@ export class BookingsService {
       return { physiotherapistId: therapist.id };
     }
     return {};
+  }
+
+  private calendarAppointmentTypeLabel(type: string): string {
+    if (type === AppointmentType.HOME_VISIT) {
+      return 'Home visit';
+    }
+    if (type === AppointmentType.CLINIC_VISIT) {
+      return 'Kunjungan klinik';
+    }
+    return type;
   }
 
   private toCalendarBookingItem(

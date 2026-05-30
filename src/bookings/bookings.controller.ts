@@ -20,11 +20,13 @@ import {
   ApiCreatedResponse,
   ApiOkResponse,
   ApiOperation,
+  ApiProduces,
   ApiTags,
 } from '@nestjs/swagger';
 import { UserRole } from '@prisma/client';
 import { Request } from 'express';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { SkipEnvelope } from '../common/decorators/skip-envelope.decorator';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { AuthUser } from '../common/types/auth-user.type';
 import { BookingsService } from './bookings.service';
@@ -107,6 +109,32 @@ export class BookingsController {
       req.user as AuthUser,
       query,
     );
+  }
+
+  @SkipEnvelope()
+  @Roles(UserRole.ADMIN, UserRole.PATIENT, UserRole.PHYSIOTHERAPIST)
+  @Get('bookings/calendar/export')
+  @ApiProduces('text/calendar')
+  @ApiOperation({
+    summary:
+      'Download bookings in date range as iCalendar (.ics) for calendar apps',
+  })
+  async exportMyBookingsCalendar(
+    @Req() req: Request,
+    @Query() query: CalendarBookingsQueryDto,
+    @Res() res: Response,
+  ): Promise<void> {
+    const { ics, filename } =
+      await this.bookingsService.exportMyBookingsCalendarIcs(
+        req.user as AuthUser,
+        query,
+      );
+    res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${filename}"`,
+    );
+    res.send(ics);
   }
 
   @Roles(UserRole.ADMIN, UserRole.PATIENT, UserRole.PHYSIOTHERAPIST)

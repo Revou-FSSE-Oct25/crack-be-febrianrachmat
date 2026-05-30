@@ -8,6 +8,8 @@ describe('BookingsController', () => {
     updateConsultationStatus: jest.fn(),
     createBooking: jest.fn(),
     listMyBookings: jest.fn(),
+    listMyBookingsCalendar: jest.fn(),
+    exportMyBookingsCalendarIcs: jest.fn(),
     updateBookingStatus: jest.fn(),
     rescheduleBooking: jest.fn(),
     createTransaction: jest.fn(),
@@ -76,6 +78,38 @@ describe('BookingsController', () => {
       'booking-1',
       dto,
     );
+  });
+
+  it('streams calendar export as attachment', async () => {
+    const query = {
+      from: '2026-05-01T00:00:00.000Z',
+      to: '2026-05-31T23:59:59.999Z',
+    };
+    bookingsServiceMock.exportMyBookingsCalendarIcs.mockResolvedValue({
+      ics: 'BEGIN:VCALENDAR\r\nEND:VCALENDAR\r\n',
+      filename: 'janji-temu-2026-05.ics',
+      eventCount: 0,
+    });
+    const res = {
+      setHeader: jest.fn(),
+      send: jest.fn(),
+    };
+
+    await controller.exportMyBookingsCalendar(
+      REQ as never,
+      query as never,
+      res as never,
+    );
+
+    expect(bookingsServiceMock.exportMyBookingsCalendarIcs).toHaveBeenCalledWith(
+      PATIENT_USER,
+      query,
+    );
+    expect(res.setHeader).toHaveBeenCalledWith(
+      'Content-Type',
+      'text/calendar; charset=utf-8',
+    );
+    expect(res.send).toHaveBeenCalledWith('BEGIN:VCALENDAR\r\nEND:VCALENDAR\r\n');
   });
 
   it('delegates rescheduleBooking with req.user, bookingId, and dto', async () => {
