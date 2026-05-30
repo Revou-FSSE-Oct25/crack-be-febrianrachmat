@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
 import { ReviewsService } from './reviews.service';
 
@@ -143,6 +143,6 @@ describe('ReviewsService', () => {
       service.updateMyReview(PATIENT_USER, 'review-1', {
         rating: 3,
       }),
-    ).rejects.toThrow(ForbiddenException);
+    ).rejects.toThrow(NotFoundException);
   });
 });

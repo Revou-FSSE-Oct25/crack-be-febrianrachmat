@@ -11,6 +11,7 @@ import { BookingsController } from './bookings.controller';
 import { BookingsService } from './bookings.service';
 
 describe('Bookings listing (e2e-lite)', () => {
+  const BOOKING_ID = '11111111-1111-4111-8111-111111111111';
   let app: INestApplication;
   class MockAuthGuard implements CanActivate {
     canActivate(context: ExecutionContext): boolean {
@@ -167,17 +168,17 @@ describe('Bookings listing (e2e-lite)', () => {
 
   it('PATCH /bookings/:bookingId/status forwards user, bookingId, and status dto', async () => {
     bookingsServiceMock.updateBookingStatus.mockResolvedValue({
-      id: 'booking-1',
+      id: BOOKING_ID,
       status: 'CANCELLED',
     });
 
     await request(app.getHttpServer())
-      .patch('/bookings/booking-1/status')
+      .patch(`/bookings/${BOOKING_ID}/status`)
       .send({ status: 'CANCELLED' })
       .expect(200)
       .expect(({ body }) => {
         expect(body).toEqual({
-          id: 'booking-1',
+          id: BOOKING_ID,
           status: 'CANCELLED',
         });
       });
@@ -188,7 +189,7 @@ describe('Bookings listing (e2e-lite)', () => {
         email: 'patient@mail.com',
         role: UserRole.PATIENT,
       },
-      'booking-1',
+      BOOKING_ID,
       { status: 'CANCELLED' },
     );
   });

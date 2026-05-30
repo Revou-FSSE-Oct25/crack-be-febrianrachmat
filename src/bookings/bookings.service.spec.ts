@@ -463,6 +463,7 @@ describe('BookingsService', () => {
     });
 
     expect(prismaMock.consultation.findMany).toHaveBeenCalledWith({
+      where: {},
       orderBy: { createdAt: 'desc' },
       skip: 0,
       take: 10,
@@ -479,6 +480,7 @@ describe('BookingsService', () => {
     });
 
     expect(prismaMock.booking.findMany).toHaveBeenCalledWith({
+      where: {},
       orderBy: { appointmentDate: 'desc' },
       skip: 10,
       take: 5,
