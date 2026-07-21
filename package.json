@@ -5,9 +5,9 @@
   "main": "dist/main.js",
   "scripts": {
     "build": "tsc -p tsconfig.build.json && node scripts/copy-i18n.mjs",
-    "start": "node dist/main.js",
+    "start": "node scripts/prod-entrypoint.cjs",
     "start:dev": "ts-node-dev --respawn --transpile-only src/main.ts",
-    "start:prod": "node dist/main.js",
+    "start:prod": "node scripts/prod-entrypoint.cjs",
     "postinstall": "node scripts/postinstall.mjs",
     "prepare": "node scripts/setup-git-hooks.mjs",
     "test": "jest --passWithNoTests",
