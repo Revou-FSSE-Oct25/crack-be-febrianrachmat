@@ -1,0 +1,27 @@
+# Render Blueprint — NestJS API (Docker)
+# Deploy: Dashboard Render → New → Blueprint → pilih repo ini
+# Lalu isi env di dashboard (DATABASE_URL dari Neon, JWT_SECRET, CORS, dll.)
+
+services:
+  - type: web
+    name: crack-be-febrianrachmat
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: RUN_DB_SEED
+        value: "true"
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+      - key: API_PUBLIC_URL
+        sync: false

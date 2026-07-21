@@ -18,8 +18,9 @@ ENV SKIP_PRISMA_POSTINSTALL=1
 RUN npm ci --ignore-scripts
 RUN npx prisma generate
 
-# Salin source dan compile.
+# Salin source + scripts (build memanggil scripts/copy-i18n.mjs).
 COPY src ./src
+COPY scripts ./scripts
 RUN npm run build
 
 # ---- Stage 2: runtime ----
